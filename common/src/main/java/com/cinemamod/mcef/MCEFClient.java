@@ -26,9 +26,12 @@ import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.callback.CefContextMenuParams;
 import org.cef.callback.CefMenuModel;
+import org.cef.handler.CefAudioHandler;
 import org.cef.handler.CefContextMenuHandler;
 import org.cef.handler.CefDisplayHandler;
 import org.cef.handler.CefLoadHandler;
+import org.cef.misc.CefAudioParameters;
+import org.cef.misc.DataPointer;
 import org.cef.network.CefRequest;
 
 import java.util.ArrayList;
@@ -37,17 +40,19 @@ import java.util.List;
 /**
  * A wrapper around {@link CefClient}
  */
-public class MCEFClient implements CefLoadHandler, CefContextMenuHandler, CefDisplayHandler {
+public class MCEFClient implements CefLoadHandler, CefContextMenuHandler, CefDisplayHandler, CefAudioHandler {
     private final CefClient handle;
     private final List<CefLoadHandler> loadHandlers = new ArrayList<>();
     private final List<CefContextMenuHandler> contextMenuHandlers = new ArrayList<>();
     private final List<CefDisplayHandler> displayHandlers = new ArrayList<>();
+    private final List<CefAudioHandler> audioHandlers = new ArrayList<>();
 
     public MCEFClient(CefClient cefClient) {
         handle = cefClient;
         cefClient.addLoadHandler(this);
         cefClient.addContextMenuHandler(this);
         cefClient.addDisplayHandler(this);
+        cefClient.addAudioHandler(this);
     }
 
     public CefClient getHandle() {
@@ -145,5 +150,47 @@ public class MCEFClient implements CefLoadHandler, CefContextMenuHandler, CefDis
             if (displayHandler.onCursorChange(browser, cursorType))
                 return true;
         return false;
+    }
+    
+    public void addAudioHandler(CefAudioHandler handler) {
+        audioHandlers.add(handler);
+    }
+    
+    @Override
+    public boolean getAudioParameters(CefBrowser browser, CefAudioParameters params) {
+        for (CefAudioHandler audioHandler : audioHandlers) {
+            if (audioHandler.getAudioParameters(browser, params))
+                return true;
+        }
+        return false;
+    }
+    
+    @Override
+    public void onAudioStreamStarted(CefBrowser browser, CefAudioParameters params, int channels) {
+        for (CefAudioHandler audioHandler : audioHandlers) {
+            audioHandler.onAudioStreamStarted(browser, params, channels);
+        }
+    }
+    
+    @Override
+    public void onAudioStreamPacket(CefBrowser browser, DataPointer data, int frames, long pts) {
+        for (CefAudioHandler audioHandler : audioHandlers) {
+            audioHandler.onAudioStreamPacket(browser, data, frames, pts);
+        }
+    }
+    
+    @Override
+    public void onAudioStreamStopped(CefBrowser browser) {
+        for (CefAudioHandler audioHandler : audioHandlers) {
+            audioHandler.onAudioStreamStopped(browser);
+        }
+    }
+    
+    @Override
+    public void onAudioStreamError(CefBrowser browser, String text) {
+        for (CefAudioHandler audioHandler : audioHandlers) {
+            audioHandler.onAudioStreamError(browser, text);
+        }
+        MCEF.getLogger().warn("An audio stream threw an error: " + text);
     }
 }
