@@ -42,10 +42,12 @@ public class FileUtils {
                     if (contentLength > 0) {
                         float percentComplete = (float) bytesRead / contentLength;
                         progressListener.onProgressUpdate(task, percentComplete);
+                        progressListener.onFileProgress(task, bytesRead, contentLength, done);
                     }
 
                     if (done) {
                         progressListener.onProgressUpdate(task, 1.0f);
+                        progressListener.onFileEnd(task);
                     }
                 }))
                 .build();
@@ -75,6 +77,8 @@ public class FileUtils {
             var body = response.body();
             outputFile.getParentFile().mkdirs();
 
+            progressListener.onFileStart(task);
+
             try (var source = body.source();
                  var sink = Okio.buffer(Okio.sink(outputFile))) {
                 sink.writeAll(source);
@@ -103,6 +107,8 @@ public class FileUtils {
 
             long totalBytesRead = 0;
             float fileSizeEstimate = tarGzFile.length() * 2.6158204f; // Initial estimate for progress
+            
+            progressListener.onFileStart(task);
 
             TarArchiveEntry entry;
             while ((entry = tarInput.getNextTarEntry()) != null) {
@@ -118,12 +124,16 @@ public class FileUtils {
                             totalBytesRead += bytesRead;
                             float percentComplete = Math.min((float) totalBytesRead / fileSizeEstimate, 0.99f);
                             progressListener.onProgressUpdate(task, percentComplete);
+                            progressListener.onFileProgress(task, totalBytesRead, (long) fileSizeEstimate, false);
                         }
                     }
                 }
             }
+
+            progressListener.onFileProgress(task, totalBytesRead, (long) fileSizeEstimate, true);
         } finally {
             progressListener.onProgressUpdate(task, 1.0f);
+            progressListener.onFileEnd(task);
         }
     }
 

@@ -64,6 +64,27 @@ public class MCEFDownloadManager {
         }
 
         @Override
+        public void onFileStart(String task) {
+            for (MCEFProgressListener listener : progressListeners) {
+                listener.onFileStart(task);
+            }
+        }
+
+        @Override
+        public void onFileProgress(String task, long bytesRead, long contentLength, boolean done) {
+            for (MCEFProgressListener listener : progressListeners) {
+                listener.onFileProgress(task, bytesRead, contentLength, done);
+            }
+        }
+
+        @Override
+        public void onFileEnd(String task) {
+            for (MCEFProgressListener listener : progressListeners) {
+                listener.onFileEnd(task);
+            }
+        }
+
+        @Override
         public void onComplete() {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onComplete();
