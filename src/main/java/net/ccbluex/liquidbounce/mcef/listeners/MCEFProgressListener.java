@@ -1,7 +1,6 @@
 /*
  * MCEF (Minecraft Chromium Embedded Framework)
  * Copyright (C) 2025 CCBlueX
- * Copyright (C) 2023 CinemaMod Group
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +20,7 @@
 
 package net.ccbluex.liquidbounce.mcef.listeners;
 
-@FunctionalInterface
-public interface MCEFCursorChangeListener {
-    void onCursorChange(int cursorID);
+public interface MCEFProgressListener {
+    void onProgressUpdate(String task, float progress);
+    void onComplete();
 }

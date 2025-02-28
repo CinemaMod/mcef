@@ -1,37 +1,36 @@
 /*
- *     MCEF (Minecraft Chromium Embedded Framework)
- *     Copyright (C) 2023 CinemaMod Group
+ * MCEF (Minecraft Chromium Embedded Framework)
+ * Copyright (C) 2025 CCBlueX
+ * Copyright (C) 2023 CinemaMod Group
  *
- *     This library is free software; you can redistribute it and/or
- *     modify it under the terms of the GNU Lesser General Public
- *     License as published by the Free Software Foundation; either
- *     version 2.1 of the License, or (at your option) any later version.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
- *     This library is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *     Lesser General Public License for more details.
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
- *     You should have received a copy of the GNU Lesser General Public
- *     License along with this library; if not, write to the Free Software
- *     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
- *     USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
+ * USA
  */
 
 package net.ccbluex.liquidbounce.mcef;
 
-import net.ccbluex.liquidbounce.mcef.progress.MCEFProgressTracker;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okio.Buffer;
-import okio.Okio;
+import net.ccbluex.liquidbounce.mcef.listeners.MCEFProgressListener;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.io.FileUtils;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import static net.ccbluex.liquidbounce.mcef.utils.FileUtils.downloadFile;
+import static net.ccbluex.liquidbounce.mcef.utils.FileUtils.extractTarGz;
 
 /**
  * A downloader and extraction tool for java-cef builds.
@@ -40,7 +39,7 @@ import java.io.*;
  * in the MCEFSettings properties file; see {@link MCEFSettings}.
  * Email support@liquidbounce.net for any questions or concerns regarding the file hosting.
  */
-public class MCEFResourceManager {
+public class MCEFDownloadManager {
 
     private static final String JAVA_CEF_DOWNLOAD_URL =
             "${host}/mcef-cef/${java-cef-commit}/${platform}";
@@ -50,13 +49,29 @@ public class MCEFResourceManager {
     private final String[] hosts;
     private final String javaCefCommitHash;
     private final MCEFPlatform platform;
-    public final MCEFProgressTracker progressTracker = new MCEFProgressTracker();
     public int hostCounter = 0;
 
     private final File commitDirectory;
     private final File platformDirectory;
 
-    private MCEFResourceManager(String[] hosts, String javaCefCommitHash, MCEFPlatform platform, File directory) {
+    private final List<MCEFProgressListener> progressListeners = new ArrayList<>();
+    private final MCEFProgressListener progressListener = new MCEFProgressListener() {
+        @Override
+        public void onProgressUpdate(String task, float progress) {
+            for (MCEFProgressListener listener : progressListeners) {
+                listener.onProgressUpdate(task, progress);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            for (MCEFProgressListener listener : progressListeners) {
+                listener.onComplete();
+            }
+        }
+    };
+
+    private MCEFDownloadManager(String[] hosts, String javaCefCommitHash, MCEFPlatform platform, File directory) {
         this.hosts = hosts;
         this.javaCefCommitHash = javaCefCommitHash;
         this.platform = platform;
@@ -67,16 +82,17 @@ public class MCEFResourceManager {
     public File getPlatformDirectory() {
         return platformDirectory;
     }
+
     public File getCommitDirectory() {
         return commitDirectory;
     }
 
-    static MCEFResourceManager newResourceManager() throws IOException {
+    static MCEFDownloadManager newResourceManager() throws IOException {
         var javaCefCommit = MCEF.INSTANCE.getJavaCefCommit();
         MCEF.INSTANCE.getLogger().info("JCEF Commit: " + javaCefCommit);
         var settings = MCEF.INSTANCE.getSettings();
 
-        return new MCEFResourceManager(settings.getHosts().toArray(new String[0]), javaCefCommit,
+        return new MCEFDownloadManager(settings.getHosts().toArray(new String[0]), javaCefCommit,
                 MCEFPlatform.getPlatform(), settings.getLibrariesDirectory());
     }
 
@@ -136,56 +152,58 @@ public class MCEFResourceManager {
                     try {
                         FileUtils.forceDelete(checksumFile);
                     } catch (Exception e) {
-                        MCEF.INSTANCE.getLogger().warn("Failed to delete existing .tar.gz file", e);
+                        MCEF.INSTANCE.getLogger().warn("Failed to delete existing checksum file", e);
                     }
                 }
 
                 // Download checksum file
                 MCEF.INSTANCE.getLogger().info("Downloading checksum file... [{}/{}]", hostCounter + 1, hosts.length);
-                progressTracker.setTask("Downloading Checksum");
+
                 try {
-                    downloadFile(getJavaCefChecksumDownloadUrl(), checksumFile, progressTracker);
+                    downloadFile(progressListener, "Downloading Checksum", getJavaCefChecksumDownloadUrl(), checksumFile);
                 } catch (Exception e) {
-                    MCEF.INSTANCE.getLogger().error("Failed to download checksum file", e);
-                    throw e;
+                    MCEF.INSTANCE.getLogger().error("Failed to download checksum file from host {}", hosts[hostCounter], e);
+                    hostCounter++;
+                    if (hostCounter >= hosts.length) {
+                        throw new IOException("Failed to download checksum from all available hosts", e);
+                    }
+                    continue; // Try next host
                 }
 
                 // Download JCEF from file hosting
                 MCEF.INSTANCE.getLogger().info("Downloading JCEF... [{}/{}]", hostCounter + 1, hosts.length);
-                progressTracker.setTask("Downloading JCEF");
-                downloadFile(getJavaCefDownloadUrl(), tarGzArchive, progressTracker);
+                downloadFile(progressListener, "Downloading JCEF", getJavaCefDownloadUrl(), tarGzArchive);
 
                 // Delete existing platform directory
                 if (platformDirectory.exists()) {
                     MCEF.INSTANCE.getLogger().info("Deleting existing platform directory...");
-
-                    // Delete existing platform directory - if this fails,
-                    // we hope [extractTarGz] will overwrite the existing files instead.
                     FileUtils.deleteQuietly(platformDirectory);
                 }
 
                 // Compare checksum of .tar.gz file with remote checksum file
-                progressTracker.setTask("Comparing Checksum");
+                progressListener.onProgressUpdate("Comparing Checksum", 0.0f);
 
                 if (!compareChecksum(checksumFile, tarGzArchive)) {
                     throw new IOException("Checksum mismatch");
                 }
 
-                progressTracker.setProgress(1.0f);
-                progressTracker.done();
+                progressListener.onProgressUpdate("Comparing Checksum", 1.0f);
 
                 // Extract JCEF from tar.gz
                 MCEF.INSTANCE.getLogger().info("Extracting JCEF...");
-                extractTarGz(tarGzArchive, commitDirectory, progressTracker);
+                extractTarGz(progressListener, "Extracting JCEF...", tarGzArchive, commitDirectory);
+
                 if (tarGzArchive.exists() && !FileUtils.deleteQuietly(tarGzArchive)) {
-                    // Retry deletion on exit
                     try {
                         FileUtils.forceDeleteOnExit(tarGzArchive);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) {
+                    }
                 }
+
+                progressListener.onComplete();
                 break;
             } catch (Exception e) {
-                MCEF.INSTANCE.getLogger().error("Failed to download and extract JCEF", e);
+                MCEF.INSTANCE.getLogger().error("Failed to download and extract JCEF from host {}", hosts[hostCounter], e);
 
                 hostCounter++;
                 if (hostCounter >= hosts.length) {
@@ -193,8 +211,6 @@ public class MCEFResourceManager {
                 }
             }
         }
-
-        progressTracker.done();
     }
 
     public String[] getHosts() {
@@ -217,16 +233,14 @@ public class MCEFResourceManager {
     }
 
     /**
-     * @return true if the jcef build checksum file matches the remote checksum file (for the {@link MCEFResourceManager#javaCefCommitHash}),
+     * @return true if the jcef build checksum file matches the remote checksum file (for the {@link MCEFDownloadManager#javaCefCommitHash}),
      * false if the jcef build checksum file did not exist or did not match; this means we should redownload JCEF
      * @throws IOException
      */
     private boolean compareChecksum(File checksumFile) throws IOException {
         // Create temporary checksum file with the same name as the real checksum file and .temp appended
         var tempChecksumFile = new File(checksumFile.getCanonicalPath() + ".temp");
-
-        progressTracker.setTask("Downloading Checksum");
-        downloadFile(getJavaCefChecksumDownloadUrl(), tempChecksumFile, progressTracker);
+        downloadFile(progressListener, "Downloading Checksum", getJavaCefChecksumDownloadUrl(), tempChecksumFile);
 
         if (checksumFile.exists()) {
             boolean sameContent = FileUtils.readFileToString(checksumFile, "UTF-8").trim()
@@ -246,7 +260,7 @@ public class MCEFResourceManager {
     }
 
     private boolean compareChecksum(File checksumFile, File archiveFile) {
-        progressTracker.setTask("Comparing Checksum");
+        progressListener.onProgressUpdate("Comparing Checksum", 0.0f);
 
         if (!checksumFile.exists()) {
             throw new RuntimeException("Checksum file does not exist");
@@ -256,106 +270,21 @@ public class MCEFResourceManager {
             var checksum = FileUtils.readFileToString(checksumFile, "UTF-8").trim();
             var actualChecksum = DigestUtils.sha256Hex(new FileInputStream(archiveFile)).trim();
 
+            progressListener.onProgressUpdate("Comparing Checksum", 1.0f);
             return checksum.equals(actualChecksum);
         } catch (IOException e) {
             throw new RuntimeException("Error reading checksum file", e);
         }
     }
 
-    private void downloadFile(String urlString, File outputFile, MCEFProgressTracker percentCompleteConsumer)
-            throws IOException {
-        var client = new OkHttpClient.Builder()
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .build();
-
-        var request = new Request.Builder()
-                .url(urlString)
-                .build();
-
-        try (var response = client.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException(String.format(
-                        "Download Failed: %n" +
-                                "URL: %s%n" +
-                                "HTTP Status: %d %s%n" +
-                                "Response Headers: %s%n" +
-                                "Redirected: %s%n" +
-                                "Final URL: %s",
-                        urlString,
-                        response.code(),
-                        response.message(),
-                        response.headers(),
-                        response.priorResponse() != null,
-                        response.request().url()
-                ));
-            }
-
-            var body = response.body();
-            var contentLength = body.contentLength();
-            try (var source = body.source();
-                 var sink = Okio.buffer(Okio.sink(outputFile))) {
-
-                var buffer = new Buffer();
-                var totalBytesRead = 0L;
-                long bytesRead;
-
-                while ((bytesRead = source.read(buffer, 8192)) != -1) {
-                    sink.write(buffer, bytesRead);
-                    totalBytesRead += bytesRead;
-
-                    if (contentLength > 0) {
-                        var percentComplete = (float) totalBytesRead / contentLength;
-                        percentCompleteConsumer.setProgress(percentComplete);
-                    }
-                }
-            }
-        } catch (IOException e) {
-            throw new IOException(String.format(
-                    "Download Error:%n" +
-                            "URL: %s%n" +
-                            "Error Type: %s%n" +
-                            "Error Message: %s%n" +
-                            "Cause: %s",
-                    urlString,
-                    e.getClass().getName(),
-                    e.getMessage(),
-                    e.getCause() != null ? e.getCause().toString() : "None"
-            ), e);
+    public void registerProgressListener(MCEFProgressListener listener) {
+        if (listener != null && !progressListeners.contains(listener)) {
+            progressListeners.add(listener);
         }
     }
 
-    private void extractTarGz(File tarGzFile, File outputDirectory, MCEFProgressTracker percentCompleteConsumer)
-            throws IOException {
-        percentCompleteConsumer.setTask("Extracting");
-        outputDirectory.mkdirs();
-
-        try (TarArchiveInputStream tarInput = new TarArchiveInputStream(new GzipCompressorInputStream(new FileInputStream(tarGzFile)))) {
-            long totalBytesRead = 0;
-            float fileSizeEstimate = tarGzFile.length() * 2.6158204f; // Initial estimate for progress
-
-            TarArchiveEntry entry;
-            while ((entry = tarInput.getNextTarEntry()) != null) {
-                if (!entry.isDirectory()) {
-                    File outputFile = new File(outputDirectory, entry.getName());
-                    outputFile.getParentFile().mkdirs();
-
-                    try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outputFile))) {
-                        byte[] buffer = new byte[8192]; // Adjust buffer size for optimal I/O
-                        int bytesRead;
-                        while ((bytesRead = tarInput.read(buffer)) != -1) {
-                            outputStream.write(buffer, 0, bytesRead);
-                            totalBytesRead += bytesRead;
-                            float percentComplete = (float) totalBytesRead / fileSizeEstimate;
-                            percentCompleteConsumer.setProgress(percentComplete);
-                        }
-                    }
-                }
-            }
-        } finally {
-            percentCompleteConsumer.setProgress(1.0f); // Ensure completion regardless of exceptions
-            percentCompleteConsumer.done();
-        }
+    public void unregisterProgressListener(MCEFProgressListener listener) {
+        progressListeners.remove(listener);
     }
 
 }

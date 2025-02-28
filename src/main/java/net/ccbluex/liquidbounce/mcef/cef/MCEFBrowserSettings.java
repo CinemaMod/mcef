@@ -19,9 +19,13 @@
  * USA
  */
 
-package net.ccbluex.liquidbounce.mcef.listeners;
+package net.ccbluex.liquidbounce.mcef.cef;
 
-@FunctionalInterface
-public interface MCEFCursorChangeListener {
-    void onCursorChange(int cursorID);
+import org.cef.CefBrowserSettings;
+
+public class MCEFBrowserSettings extends CefBrowserSettings {
+    public MCEFBrowserSettings(int frameRate) {
+        super();
+        this.windowless_frame_rate = frameRate;
+    }
 }

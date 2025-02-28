@@ -1,26 +1,30 @@
 /*
- *     MCEF (Minecraft Chromium Embedded Framework)
- *     Copyright (C) 2023 CinemaMod Group
+ * MCEF (Minecraft Chromium Embedded Framework)
+ * Copyright (C) 2025 CCBlueX
+ * Copyright (C) 2023 CinemaMod Group
  *
- *     This library is free software; you can redistribute it and/or
- *     modify it under the terms of the GNU Lesser General Public
- *     License as published by the Free Software Foundation; either
- *     version 2.1 of the License, or (at your option) any later version.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
- *     This library is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *     Lesser General Public License for more details.
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
- *     You should have received a copy of the GNU Lesser General Public
- *     License along with this library; if not, write to the Free Software
- *     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
- *     USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
+ * USA
  */
 
 package net.ccbluex.liquidbounce.mcef;
 
 import net.ccbluex.liquidbounce.mcef.cef.CefHelper;
+import net.ccbluex.liquidbounce.mcef.cef.MCEFApp;
+import net.ccbluex.liquidbounce.mcef.cef.MCEFBrowser;
+import net.ccbluex.liquidbounce.mcef.cef.MCEFClient;
 import net.minecraft.client.MinecraftClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,13 +45,13 @@ public enum MCEF {
     private MCEFSettings settings;
     private MCEFApp app;
     private MCEFClient client;
-    private MCEFResourceManager resourceManager;
+    private MCEFDownloadManager resourceManager;
     
     public Logger getLogger() {
         return LOGGER;
     }
 
-    public static MinecraftClient mc = MinecraftClient.getInstance();
+    public static final MinecraftClient mc = MinecraftClient.getInstance();
 
     /**
      * Get access to various settings for MCEF.
@@ -61,8 +65,8 @@ public enum MCEF {
         return settings;
     }
 
-    public MCEFResourceManager newResourceManager() throws IOException {
-        return resourceManager = MCEFResourceManager.newResourceManager();
+    public MCEFDownloadManager newResourceManager() throws IOException {
+        return resourceManager = MCEFDownloadManager.newResourceManager();
     }
 
     public boolean initialize() {
@@ -112,7 +116,7 @@ public enum MCEF {
         return client;
     }
 
-    public MCEFResourceManager getResourceManager() {
+    public MCEFDownloadManager getResourceManager() {
         return resourceManager;
     }
 
