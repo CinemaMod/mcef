@@ -24,6 +24,7 @@ package net.ccbluex.liquidbounce.mcef;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFProgressListener;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -57,28 +58,28 @@ public class MCEFDownloadManager {
     private final List<MCEFProgressListener> progressListeners = new ArrayList<>();
     private final MCEFProgressListener progressListener = new MCEFProgressListener() {
         @Override
-        public void onProgressUpdate(String task, float progress) {
+        public void onProgressUpdate(@NotNull String task, float progress) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onProgressUpdate(task, progress);
             }
         }
 
         @Override
-        public void onFileStart(String task) {
+        public void onFileStart(@NotNull String task) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onFileStart(task);
             }
         }
 
         @Override
-        public void onFileProgress(String task, long bytesRead, long contentLength, boolean done) {
+        public void onFileProgress(@NotNull String task, long bytesRead, long contentLength, boolean done) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onFileProgress(task, bytesRead, contentLength, done);
             }
         }
 
         @Override
-        public void onFileEnd(String task) {
+        public void onFileEnd(@NotNull String task) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onFileEnd(task);
             }
@@ -156,82 +157,95 @@ public class MCEFDownloadManager {
     public void downloadJcef() throws IOException {
         hostCounter = 0;
 
+        var tarGzArchive = new File(commitDirectory, platform.getNormalizedName() + ".tar.gz");
+        var checksumFile = new File(commitDirectory, platform.getNormalizedName() + ".tar.gz.sha256");
+
         while (true) {
-            try {
-                var tarGzArchive = new File(commitDirectory, platform.getNormalizedName() + ".tar.gz");
-                var checksumFile = new File(commitDirectory, platform.getNormalizedName() + ".tar.gz.sha256");
-
-                if (tarGzArchive.exists()) {
-                    try {
-                        FileUtils.forceDelete(tarGzArchive);
-                    } catch (Exception e) {
-                        MCEF.INSTANCE.getLogger().warn("Failed to delete existing .tar.gz file", e);
-                    }
-                }
-
-                if (checksumFile.exists()) {
-                    try {
-                        FileUtils.forceDelete(checksumFile);
-                    } catch (Exception e) {
-                        MCEF.INSTANCE.getLogger().warn("Failed to delete existing checksum file", e);
-                    }
-                }
-
-                // Download checksum file
-                MCEF.INSTANCE.getLogger().info("Downloading checksum file... [{}/{}]", hostCounter + 1, hosts.length);
-
+            if (checksumFile.exists()) {
                 try {
-                    downloadFile(progressListener, "Downloading Checksum", getJavaCefChecksumDownloadUrl(), checksumFile);
+                    FileUtils.forceDelete(checksumFile);
                 } catch (Exception e) {
-                    MCEF.INSTANCE.getLogger().error("Failed to download checksum file from host {}", hosts[hostCounter], e);
-                    hostCounter++;
-                    if (hostCounter >= hosts.length) {
-                        throw new IOException("Failed to download checksum from all available hosts", e);
-                    }
-                    continue; // Try next host
+                    MCEF.INSTANCE.getLogger().warn("Failed to delete existing checksum file", e);
                 }
+            }
 
+            // Download checksum file
+            MCEF.INSTANCE.getLogger().info("Downloading checksum file... [{}/{}]", hostCounter + 1, hosts.length);
+
+            try {
+                downloadFile(progressListener, "Downloading Checksum", getJavaCefChecksumDownloadUrl(), checksumFile);
+            } catch (Exception e) {
+                MCEF.INSTANCE.getLogger().error("Failed to download checksum file from host {}", hosts[hostCounter], e);
+                hostCounter++;
+                if (hostCounter >= hosts.length) {
+                    throw new IOException("Failed to download checksum from all available hosts", e);
+                }
+            }
+
+            // If we reach this point,
+            // we have successfully downloaded the checksum file
+            if (checksumFile.exists()) {
+                break;
+            }
+        }
+
+        while (true) {
+            if (tarGzArchive.exists()) {
+                try {
+                    FileUtils.forceDelete(tarGzArchive);
+                } catch (Exception e) {
+                    MCEF.INSTANCE.getLogger().warn("Failed to delete existing .tar.gz file", e);
+                }
+            }
+
+            try {
                 // Download JCEF from file hosting
                 MCEF.INSTANCE.getLogger().info("Downloading JCEF... [{}/{}]", hostCounter + 1, hosts.length);
                 downloadFile(progressListener, "Downloading JCEF", getJavaCefDownloadUrl(), tarGzArchive);
 
-                // Delete existing platform directory
-                if (platformDirectory.exists()) {
-                    MCEF.INSTANCE.getLogger().info("Deleting existing platform directory...");
-                    FileUtils.deleteQuietly(platformDirectory);
-                }
-
-                // Compare checksum of .tar.gz file with remote checksum file
+                // Compare checksum of archive file with remote checksum file
                 progressListener.onProgressUpdate("Comparing Checksum", 0.0f);
-
                 if (!compareChecksum(checksumFile, tarGzArchive)) {
                     throw new IOException("Checksum mismatch");
                 }
-
                 progressListener.onProgressUpdate("Comparing Checksum", 1.0f);
-
-                // Extract JCEF from tar.gz
-                MCEF.INSTANCE.getLogger().info("Extracting JCEF...");
-                extractTarGz(progressListener, "Extracting JCEF...", tarGzArchive, commitDirectory);
-
-                if (tarGzArchive.exists() && !FileUtils.deleteQuietly(tarGzArchive)) {
-                    try {
-                        FileUtils.forceDeleteOnExit(tarGzArchive);
-                    } catch (Exception ignored) {
-                    }
-                }
-
-                progressListener.onComplete();
-                break;
             } catch (Exception e) {
-                MCEF.INSTANCE.getLogger().error("Failed to download and extract JCEF from host {}", hosts[hostCounter], e);
-
+                MCEF.INSTANCE.getLogger().error("Failed to download JCEF from host {}", hosts[hostCounter], e);
                 hostCounter++;
                 if (hostCounter >= hosts.length) {
-                    throw e;
+                    throw new IOException("Failed to download JCEF from all available hosts", e);
                 }
             }
+
+            // If we reach this point,
+            // we have successfully downloaded the JCEF build
+            if (tarGzArchive.exists()) {
+                break;
+            }
         }
+
+        // Delete existing platform directory
+        if (platformDirectory.exists()) {
+            MCEF.INSTANCE.getLogger().info("Deleting existing platform directory...");
+            FileUtils.deleteQuietly(platformDirectory);
+        }
+
+        // Extract JCEF from tar.gz
+        try {
+            MCEF.INSTANCE.getLogger().info("Extracting JCEF...");
+            extractTarGz(progressListener, "Extracting JCEF...", tarGzArchive, commitDirectory);
+        } catch (IOException e) {
+            throw new IOException("Failed to extract JCEF", e);
+        }
+
+        if (tarGzArchive.exists() && !FileUtils.deleteQuietly(tarGzArchive)) {
+            try {
+                FileUtils.forceDeleteOnExit(tarGzArchive);
+            } catch (Exception ignored) {
+            }
+        }
+
+        progressListener.onComplete();
     }
 
     public String[] getHosts() {

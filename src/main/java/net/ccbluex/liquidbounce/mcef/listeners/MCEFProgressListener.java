@@ -20,6 +20,8 @@
 
 package net.ccbluex.liquidbounce.mcef.listeners;
 
+import org.jetbrains.annotations.NotNull;
+
 public interface MCEFProgressListener {
 
     /**
@@ -28,7 +30,7 @@ public interface MCEFProgressListener {
      * @param task Task name
      * @param progress Progress
      */
-    void onProgressUpdate(String task, float progress);
+    void onProgressUpdate(@NotNull String task, float progress);
 
     /**
      * If everything is complete
@@ -39,7 +41,7 @@ public interface MCEFProgressListener {
      * File download or extraction start
      * @param task Task name
      */
-    void onFileStart(String task);
+    void onFileStart(@NotNull String task);
 
     /**
      * File download or extraction progress
@@ -48,12 +50,12 @@ public interface MCEFProgressListener {
      * @param contentLength Total bytes
      * @param done Is download or extraction done
      */
-    void onFileProgress(String task, long bytesRead, long contentLength, boolean done);
+    void onFileProgress(@NotNull String task, long bytesRead, long contentLength, boolean done);
 
     /**
      * File download or extraction end
      * @param task Task name
      */
-    void onFileEnd(String task);
+    void onFileEnd(@NotNull String task);
 
 }
