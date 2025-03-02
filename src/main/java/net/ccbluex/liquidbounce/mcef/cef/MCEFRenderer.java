@@ -40,6 +40,13 @@ public class MCEFRenderer {
         RenderSystem.bindTexture(textureID[0]);
         RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        var emptyBuffer = ByteBuffer.allocateDirect(4);
+        emptyBuffer.put((byte) 0).put((byte) 0).put((byte) 0).put((byte) 0); // BGRA: fully transparent
+        emptyBuffer.flip();
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, emptyBuffer);
+
         RenderSystem.bindTexture(0);
     }
 
