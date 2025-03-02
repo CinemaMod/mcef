@@ -91,7 +91,7 @@ public class MCEFBrowser extends CefBrowserOsr {
         renderer = new MCEFRenderer(transparent);
         cursorChangeListener = (cefCursorID) -> setCursor(CefCursorType.fromId(cefCursorID));
 
-        mc.submit(renderer::initialize);
+        RenderSystem.recordRenderCall(renderer::initialize);
     }
 
     public MCEFRenderer getRenderer() {
@@ -361,7 +361,7 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     @Override
     protected void finalize() throws Throwable {
-        mc.submit(renderer::cleanup);
+        RenderSystem.recordRenderCall(renderer::cleanup);
         super.finalize();
     }
 
