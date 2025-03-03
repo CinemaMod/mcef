@@ -30,6 +30,7 @@ import static org.lwjgl.opengl.GL12.*;
 public class MCEFRenderer {
     private final boolean transparent;
     private final int[] textureID = new int[1];
+    private boolean unpainted = true;
 
     protected MCEFRenderer(boolean transparent) {
         this.transparent = transparent;
@@ -40,18 +41,16 @@ public class MCEFRenderer {
         RenderSystem.bindTexture(textureID[0]);
         RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        var emptyBuffer = ByteBuffer.allocateDirect(4);
-        emptyBuffer.put((byte) 0).put((byte) 0).put((byte) 0).put((byte) 0); // BGRA: fully transparent
-        emptyBuffer.flip();
-
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, emptyBuffer);
-
         RenderSystem.bindTexture(0);
+        unpainted = true;
     }
 
     public int getTextureID() {
         return textureID[0];
+    }
+
+    public boolean isUnpainted() {
+        return unpainted;
     }
 
     public boolean isTransparent() {
@@ -80,10 +79,12 @@ public class MCEFRenderer {
         RenderSystem.pixelStore(GL_UNPACK_SKIP_ROWS, 0);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
                 GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
+        unpainted = false;
     }
 
     protected void onPaint(ByteBuffer buffer, int x, int y, int width, int height) {
         glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA,
                 GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
+        unpainted = false;
     }
 }

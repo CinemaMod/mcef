@@ -131,8 +131,9 @@ public class MCEFBrowser extends CefBrowserOsr {
     @Override
     public void onPaint(CefBrowser browser, boolean popup, Rectangle[] dirtyRects, ByteBuffer buffer, int width, int height) {
         // nothing to update
-        if (dirtyRects.length == 0)
+        if (dirtyRects.length == 0) {
             return;
+        }
 
         if (!popup) {
             if (lastWidth != width || lastHeight != height) {
