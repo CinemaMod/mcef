@@ -82,7 +82,11 @@ public enum MCEFPlatform {
         var processorId = systemInfo.getHardware().getProcessor().getProcessorIdentifier();
 
         // Base requirement: 64-bit CPU
-        if (!processorId.isCpu64bit()) {
+        // In some occasions, the WMI query may fail to get the CPU architecture,
+        // and instead of throwing an exception, it will assume a 32-bit architecture,
+        // so we also check the system property to ensure compatibility.
+        if (!processorId.isCpu64bit() && !System.getProperty("os.arch").contains("64")) {
+            MCEF.INSTANCE.getLogger().error("MCEF requires a 64-bit CPU");
             return false;
         }
 
@@ -96,14 +100,21 @@ public enum MCEFPlatform {
 
     private static boolean checkWindowsCompatibility(String buildNumberStr) {
         if (buildNumberStr == null) {
-            return false;
+            MCEF.INSTANCE.getLogger().error("Failed to get Windows build number");
+
+            // Assume compatibility
+            return true;
         }
 
         try {
+            MCEF.INSTANCE.getLogger().info("Windows build number: {}", buildNumberStr);
             var buildNumber = Integer.parseInt(buildNumberStr);
             return buildNumber >= 10240; // Windows 10 minimum
         } catch (NumberFormatException e) {
-            return false;
+            MCEF.INSTANCE.getLogger().error("Failed to parse Windows build number");
+
+            // Assume compatibility
+            return true;
         }
     }
 
