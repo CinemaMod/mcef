@@ -21,11 +21,16 @@
 
 package net.ccbluex.liquidbounce.mcef;
 
-import oshi.SystemInfo;
+import net.minecraft.util.Util;
 
 import java.util.Locale;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.IOException;
+import java.util.Objects;
 
 public enum MCEFPlatform {
+
     LINUX_AMD64,
     LINUX_ARM64,
     WINDOWS_AMD64,
@@ -38,15 +43,24 @@ public enum MCEFPlatform {
     }
 
     public boolean isLinux() {
-        return this == LINUX_AMD64 || this == LINUX_ARM64;
+        return switch (this) {
+            case LINUX_AMD64, LINUX_ARM64 -> true;
+            default -> false;
+        };
     }
 
     public boolean isWindows() {
-        return this == WINDOWS_AMD64 || this == WINDOWS_ARM64;
+        return switch (this) {
+            case WINDOWS_AMD64, WINDOWS_ARM64 -> true;
+            default -> false;
+        };
     }
 
     public boolean isMacOS() {
-        return this == MACOS_AMD64 || this == MACOS_ARM64;
+        return switch (this) {
+            case MACOS_AMD64, MACOS_ARM64 -> true;
+            default -> false;
+        };
     }
 
     private static MCEFPlatform platformInstance;
@@ -56,65 +70,100 @@ public enum MCEFPlatform {
             return platformInstance;
         }
 
-        var systemInfo = new SystemInfo();
-        var platform = SystemInfo.getCurrentPlatform();
-        var processorId = systemInfo.getHardware().getProcessor().getProcessorIdentifier();
+        var operatingSystem = Util.getOperatingSystem();
+        var osArch = System.getProperty("os.arch").toLowerCase(Locale.ENGLISH);
 
-        var isArm = processorId.isCpu64bit() &&
-                processorId.getMicroarchitecture().toLowerCase(Locale.ENGLISH).contains("arm");
+        MCEF.INSTANCE.getLogger().info("Operating system: {}", operatingSystem);
+        MCEF.INSTANCE.getLogger().info("Architecture: {}", osArch);
 
-        platformInstance = switch (platform) {
-            case WINDOWS, WINDOWSCE -> isArm ? WINDOWS_ARM64 : WINDOWS_AMD64;
-            case MACOS -> isArm ? MACOS_ARM64 : MACOS_AMD64;
-            case LINUX -> isArm ? LINUX_ARM64 : LINUX_AMD64;
-            default -> throw new RuntimeException("Unsupported platform: %s %s".formatted(
-                    platform, processorId.getMicroarchitecture()
-            ));
+        var isAMD64 = osArch.contains("amd64") || osArch.contains("x86_64");
+        var isArm = osArch.contains("aarch64") || osArch.contains("arm64");
+
+        platformInstance = switch (operatingSystem) {
+            case WINDOWS -> isAMD64 ? WINDOWS_AMD64 : isArm ? WINDOWS_ARM64 : null;
+            case OSX -> isAMD64 ? MACOS_AMD64 : isArm ? MACOS_ARM64 : null;
+            case LINUX -> isAMD64 ? LINUX_AMD64 : isArm ? LINUX_ARM64 : null;
+            default -> throw new IllegalStateException("Unsupported platform: " + operatingSystem + " " + osArch);
         };
 
         return platformInstance;
     }
 
     public boolean isSystemCompatible() {
-        var systemInfo = new SystemInfo();
-        var platform = SystemInfo.getCurrentPlatform();
-        var os = systemInfo.getOperatingSystem();
-        var processorId = systemInfo.getHardware().getProcessor().getProcessorIdentifier();
+        var operatingSystem = Util.getOperatingSystem();
+        var osVersion = System.getProperty("os.version");
+        MCEF.INSTANCE.getLogger().info("OS version: {}", osVersion);
 
-        // Base requirement: 64-bit CPU
-        // In some occasions, the WMI query may fail to get the CPU architecture,
-        // and instead of throwing an exception, it will assume a 32-bit architecture,
-        // so we also check the system property to ensure compatibility.
-        if (!processorId.isCpu64bit() && !System.getProperty("os.arch").contains("64")) {
-            MCEF.INSTANCE.getLogger().error("MCEF requires a 64-bit CPU");
-            return false;
-        }
-
-        return switch (platform) {
-            case WINDOWS -> checkWindowsCompatibility(os.getVersionInfo().getBuildNumber());
-            case MACOS -> checkMacOSCompatibility(os.getVersionInfo().getVersion());
-            case LINUX -> true; // Just checking 64-bit for Linux
-            default -> false;
+        return switch (operatingSystem) {
+            case WINDOWS -> checkWindowsCompatibility();
+            case OSX -> checkMacOSCompatibility(osVersion);
+            case LINUX -> true; // Assume Linux compatibility
+            default -> false; // Unsupported OS
         };
     }
 
-    private static boolean checkWindowsCompatibility(String buildNumberStr) {
-        if (buildNumberStr == null) {
-            MCEF.INSTANCE.getLogger().error("Failed to get Windows build number");
-
-            // Assume compatibility
-            return true;
-        }
-
+    private static boolean checkWindowsCompatibility() {
         try {
-            MCEF.INSTANCE.getLogger().info("Windows build number: {}", buildNumberStr);
-            var buildNumber = Integer.parseInt(buildNumberStr);
-            return buildNumber >= 10240; // Windows 10 minimum
-        } catch (NumberFormatException e) {
-            MCEF.INSTANCE.getLogger().error("Failed to parse Windows build number");
+            var buildNumber = getWindowsBuildNumber();
+            MCEF.INSTANCE.getLogger().info("Windows build number: {}", buildNumber);
 
-            // Assume compatibility
-            return true;
+            if (buildNumber == null) {
+                MCEF.INSTANCE.getLogger().error("Failed to get Windows build number");
+                return true; // Assume compatibility
+            }
+
+            return Integer.parseInt(buildNumber) >= 10240; // Windows 10 minimum
+        } catch (NumberFormatException e) {
+            MCEF.INSTANCE.getLogger().error("Failed to parse Windows build number", e);
+            return true; // Assume compatibility
+        }
+    }
+
+    private static String getWindowsBuildNumber() {
+        try {
+            var cmdArray = new String[]{"cmd", "/c", "ver"};
+            var process = Runtime.getRuntime().exec(cmdArray);
+
+            try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                var result = reader.lines()
+                        .filter(line -> line.contains("[Version"))
+                        .map(line -> {
+                            try {
+                                return line.split("\\[Version ")[1].replace("]", "").split("\\.")[2];
+                            } catch (ArrayIndexOutOfBoundsException e) {
+                                MCEF.INSTANCE.getLogger().error("Failed to parse Windows version string: {}", line, e);
+                                return null;
+                            }
+                        })
+                        .filter(Objects::nonNull)
+                        .findFirst()
+                        .orElseGet(MCEFPlatform::getWmicBuildNumber);
+
+                process.waitFor(); // Wait for process to complete
+                return result;
+            }
+        } catch (IOException | InterruptedException e) {
+            MCEF.INSTANCE.getLogger().error("Failed to execute command to get Windows build number", e);
+            return null;
+        }
+    }
+
+
+    private static String getWmicBuildNumber() {
+        try {
+            var wmicCmdArray = new String[]{"wmic", "os", "get", "BuildNumber"};
+            var process = Runtime.getRuntime().exec(wmicCmdArray);
+
+            try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                return reader.lines()
+                        .skip(1) // Skip header line
+                        .filter(line -> !line.trim().isEmpty())
+                        .findFirst()
+                        .orElse(null);
+            }
+        } catch (IOException e) {
+            MCEF.INSTANCE.getLogger().error("Failed to execute wmic command", e);
+            return null;
         }
     }
 
@@ -136,7 +185,7 @@ public enum MCEFPlatform {
 
     public String[] requiredLibraries() {
         return switch (this) {
-            case WINDOWS_AMD64, WINDOWS_ARM64 -> new String[] {
+            case WINDOWS_AMD64, WINDOWS_ARM64 -> new String[]{
                     "d3dcompiler_47.dll",
                     "libGLESv2.dll",
                     "libEGL.dll",
@@ -144,10 +193,10 @@ public enum MCEFPlatform {
                     "libcef.dll",
                     "jcef.dll"
             };
-            case MACOS_AMD64, MACOS_ARM64 -> new String[] {
+            case MACOS_AMD64, MACOS_ARM64 -> new String[]{
                     "libjcef.dylib"
             };
-            case LINUX_AMD64, LINUX_ARM64 -> new String[] {
+            case LINUX_AMD64, LINUX_ARM64 -> new String[]{
                     "libcef.so",
                     "libjcef.so"
             };

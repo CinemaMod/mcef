@@ -60,7 +60,6 @@ dependencies {
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    implementation "com.github.oshi:oshi-core:6.6.5"
     implementation "com.squareup.okhttp3:okhttp:5.0.0-alpha.14"
 }
 
