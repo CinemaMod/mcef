@@ -31,9 +31,9 @@ import org.cef.event.CefKeyEvent;
 import org.cef.event.CefMouseEvent;
 import org.cef.event.CefMouseWheelEvent;
 import org.cef.misc.CefCursorType;
+import org.cef.handler.CefScreenInfo;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.system.libc.LibCString;
 
 import java.awt.*;
 import java.nio.ByteBuffer;
@@ -76,6 +76,14 @@ public class MCEFBrowser extends CefBrowserOsr {
      * CEF is a bit odd and implements mouse buttons as a part of modifier flags.
      */
     private int btnMask = 0;
+    /**
+     * Whether MCEF should automatically calculate the device scale factor.
+     * The device scale factor is used to determine how content should be scaled based on the
+     * DPI of the monitor that the window is on. This is important for high-DPI displays where
+     * the device scale factor is greater than 1.
+     */
+    private boolean autoDSF;
+    private double deviceScaleFactor = 1;
 
     // Data relating to popups and graphics
     // Marked as protected in-case a mod wants to extend MCEFBrowser and override the repaint logic
@@ -85,9 +93,14 @@ public class MCEFBrowser extends CefBrowserOsr {
     protected boolean popupDrawn = false;
 
     public MCEFBrowser(MCEFClient client, String url, boolean transparent) {
+        this(client, url, transparent, false);
+    }
+
+    public MCEFBrowser(MCEFClient client, String url, boolean transparent, boolean autoDSF) {
         super(client.getHandle(), url, transparent, null);
         renderer = new MCEFRenderer(transparent);
         cursorChangeListener = (cefCursorID) -> setCursor(CefCursorType.fromId(cefCursorID));
+        this.autoDSF = autoDSF;
 
         Minecraft.getInstance().submit(renderer::initialize);
     }
@@ -96,7 +109,16 @@ public class MCEFBrowser extends CefBrowserOsr {
         return renderer;
     }
 
-    public static double getDeviceScaleFactor() {
+    public void setAutoDSF(boolean autoDSF) {
+      this.autoDSF = autoDSF;
+    }
+
+    public boolean isAutoDSF() {
+      return autoDSF;
+    }
+
+    public double getDeviceScaleFactor() {
+      if (autoDSF == true) {
         long window = Minecraft.getInstance().getWindow().getWindow();
 
         int[] fbWidth = new int[1];
@@ -110,6 +132,25 @@ public class MCEFBrowser extends CefBrowserOsr {
         // The device scale factor is the ratio of the allocated framebuffer size to the window size
         // https://stackoverflow.com/questions/44719635/what-is-the-difference-between-glfwgetwindowsize-and-glfwgetframebuffersize
         return Math.max(1, Math.min(fbWidth[0] / winWidth[0], fbHeight[0] / winHeight[0]));
+      }
+      
+      if (deviceScaleFactor > 0) {
+        return deviceScaleFactor;
+      }
+
+      return 1;
+    }
+
+    public void setDeviceScaleFactor(double deviceScaleFactor) {
+      this.deviceScaleFactor = deviceScaleFactor;
+    }
+
+    public int scaleX(int x) {
+        return (int) (x / getDeviceScaleFactor());
+    }
+
+    public int scaleY(int y) {
+        return (int) (y / getDeviceScaleFactor());
     }
 
     public boolean getScreenInfo(CefBrowser browser, CefScreenInfo screenInfo) {
@@ -243,6 +284,9 @@ public class MCEFBrowser extends CefBrowserOsr {
     }
 
     public void resize(int width, int height) {
+        width = scaleX(width);
+        height = scaleY(height);
+
         browser_rect_.setBounds(0, 0, width, height);
         wasResized(width, height);
     }
@@ -316,6 +360,9 @@ public class MCEFBrowser extends CefBrowserOsr {
     }
 
     public void sendMouseMove(int mouseX, int mouseY) {
+        mouseX = scaleX(mouseX);
+        mouseY = scaleY(mouseY);
+
         CefMouseEvent e = new CefMouseEvent(CefMouseEvent.MOUSE_MOVED, mouseX, mouseY, 0, 0, dragContext.getVirtualModifiers(btnMask));
         sendMouseEvent(e);
 
@@ -325,6 +372,9 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     // TODO: it may be necessary to add modifiers here
     public void sendMousePress(int mouseX, int mouseY, int button) {
+        mouseX = scaleX(mouseX);
+        mouseY = scaleY(mouseY);
+
         // for some reason, middle and right are swapped in MC
         if (button == 1) button = 2;
         else if (button == 2) button = 1;
@@ -339,6 +389,9 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     // TODO: it may be necessary to add modifiers here
     public void sendMouseRelease(int mouseX, int mouseY, int button) {
+        mouseX = scaleX(mouseX);
+        mouseY = scaleY(mouseY);
+
         // For some reason, middle and right are swapped in MC
         if (button == 1) button = 2;
         else if (button == 2) button = 1;
@@ -360,6 +413,9 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     // TODO: smooth scrolling
     public void sendMouseWheel(int mouseX, int mouseY, double amount, int modifiers) {
+        mouseX = scaleX(mouseX);
+        mouseY = scaleY(mouseY);
+
         if (browserControls) {
             if ((modifiers & GLFW_MOD_CONTROL) != 0) {
                 if (amount > 0) {
@@ -389,6 +445,9 @@ public class MCEFBrowser extends CefBrowserOsr {
     // Drag & drop
     @Override
     public boolean startDragging(CefBrowser browser, CefDragData dragData, int mask, int x, int y) {
+        x = scaleX(x);
+        y = scaleY(y);
+
         dragContext.startDragging(dragData, mask);
         this.dragTargetDragEnter(dragContext.getDragData(), new Point(x, y), btnMask, dragContext.getMask());
         // Indicates to CEF to not handle the drag event natively
@@ -407,10 +466,16 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     // Expose drag & drop functions
     public void startDragging(CefDragData dragData, int mask, int x, int y) { // Overload since the JCEF method requires a browser, which then goes unused
-        startDragging(dragData, mask, x, y);
+      x = scaleX(x);
+      y = scaleY(y);  
+      
+      startDragging(dragData, mask, x, y);
     }
 
     public void finishDragging(int x, int y) {
+        x = scaleX(x);
+        y = scaleY(y);
+
         dragTargetDrop(new Point(x, y), btnMask);
         dragTargetDragLeave();
         dragContext.stopDragging();
