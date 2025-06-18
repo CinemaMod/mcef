@@ -117,8 +117,12 @@ public class MCEFBrowser extends CefBrowserOsr {
       return autoDSF;
     }
 
+    public void setDeviceScaleFactor(double deviceScaleFactor) {
+      this.deviceScaleFactor = deviceScaleFactor;
+    }
+
     public double getDeviceScaleFactor() {
-      if (autoDSF == true) {
+      if (autoDSF) {
         long window = Minecraft.getInstance().getWindow().getWindow();
 
         int[] fbWidth = new int[1];
@@ -132,17 +136,9 @@ public class MCEFBrowser extends CefBrowserOsr {
         // The device scale factor is the ratio of the allocated framebuffer size to the window size
         // https://stackoverflow.com/questions/44719635/what-is-the-difference-between-glfwgetwindowsize-and-glfwgetframebuffersize
         return Math.max(1, Math.min(fbWidth[0] / winWidth[0], fbHeight[0] / winHeight[0]));
+      } else {
+          return deviceScaleFactor > 0 ? deviceScaleFactor : 1;
       }
-      
-      if (deviceScaleFactor > 0) {
-        return deviceScaleFactor;
-      }
-
-      return 1;
-    }
-
-    public void setDeviceScaleFactor(double deviceScaleFactor) {
-      this.deviceScaleFactor = deviceScaleFactor;
     }
 
     public int scaleX(int x) {

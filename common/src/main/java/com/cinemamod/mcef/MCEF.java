@@ -135,7 +135,7 @@ public final class MCEF {
      */
     public static MCEFBrowser createBrowser(String url, boolean transparent) {
         assertInitialized();
-        MCEFBrowser browser = new MCEFBrowser(client, url, transparent);
+        MCEFBrowser browser = new MCEFBrowser(client, url, transparent, true);
         browser.setCloseAllowed();
         browser.createImmediately();
         return browser;
@@ -149,7 +149,7 @@ public final class MCEF {
      */
     public static MCEFBrowser createBrowser(String url, boolean transparent, int width, int height) {
         assertInitialized();
-        MCEFBrowser browser = new MCEFBrowser(client, url, transparent);
+        MCEFBrowser browser = new MCEFBrowser(client, url, transparent, true);
         browser.setCloseAllowed();
         browser.createImmediately();
         browser.resize(width, height);
