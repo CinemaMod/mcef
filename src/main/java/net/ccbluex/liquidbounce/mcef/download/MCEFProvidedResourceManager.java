@@ -8,7 +8,7 @@ import java.io.File;
 public class MCEFProvidedResourceManager extends MCEFDownloadManager {
     private final File path;
 
-    protected MCEFProvidedResourceManager(File path, String[] hosts, String javaCefCommitHash, MCEFPlatform platform, File directory) {
+    public MCEFProvidedResourceManager(File path, String[] hosts, String javaCefCommitHash, MCEFPlatform platform, File directory) {
         super(hosts, javaCefCommitHash, platform, directory);
 
         this.path = path;
