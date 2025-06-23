@@ -21,6 +21,7 @@
 
 package net.ccbluex.liquidbounce.mcef;
 
+import net.ccbluex.liquidbounce.mcef.download.MCEFProvidedResourceManager;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFProgressListener;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
@@ -93,7 +94,7 @@ public class MCEFDownloadManager {
         }
     };
 
-    private MCEFDownloadManager(String[] hosts, String javaCefCommitHash, MCEFPlatform platform, File directory) {
+    protected MCEFDownloadManager(String[] hosts, String javaCefCommitHash, MCEFPlatform platform, File directory) {
         this.hosts = hosts;
         this.javaCefCommitHash = javaCefCommitHash;
         this.platform = platform;
@@ -113,6 +114,13 @@ public class MCEFDownloadManager {
         var javaCefCommit = MCEF.INSTANCE.getJavaCefCommit();
         MCEF.INSTANCE.getLogger().info("JCEF Commit: " + javaCefCommit);
         var settings = MCEF.INSTANCE.getSettings();
+
+        var providedPath = System.getenv("PROVIDED_JCEF_PATH");
+
+        if (providedPath != null && !providedPath.trim().isEmpty()) {
+            return new MCEFProvidedResourceManager(new File(providedPath), settings.getHosts().toArray(new String[0]), javaCefCommit,
+                    MCEFPlatform.getPlatform(), settings.getLibrariesDirectory());
+        }
 
         return new MCEFDownloadManager(settings.getHosts().toArray(new String[0]), javaCefCommit,
                 MCEFPlatform.getPlatform(), settings.getLibrariesDirectory());
