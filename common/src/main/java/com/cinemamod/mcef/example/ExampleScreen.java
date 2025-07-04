@@ -24,6 +24,7 @@ import com.cinemamod.mcef.MCEF;
 import com.cinemamod.mcef.MCEFBrowser;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
@@ -93,7 +94,7 @@ public class ExampleScreen extends Screen {
         super.render(guiGraphics, i, j, f);
 //        RenderSystem.disableDepthTest();
 //        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-        GpuTexture texture = RenderSystem.getShaderTexture(browser.getRenderer().getTextureID());
+        GpuTextureView texture = RenderSystem.getShaderTexture(browser.getRenderer().getTextureID());
         RenderSystem.setShaderTexture(0, texture);
         Tesselator t = Tesselator.getInstance();
         BufferBuilder buffer = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);

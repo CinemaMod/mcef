@@ -21,7 +21,7 @@
 package com.cinemamod.mcef;
 
 import com.cinemamod.mcef.listeners.MCEFCursorChangeListener;
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import org.cef.browser.CefBrowser;
@@ -157,8 +157,8 @@ public class MCEFBrowser extends CefBrowserOsr {
                 renderer.onPaint(buffer, width, height);
             } else {
                 if (renderer.getTextureID() == 0) return;
-                RenderSystem.bindTexture(renderer.getTextureID());
-                RenderSystem.pixelStore(GL_UNPACK_ROW_LENGTH, width);
+                GlStateManager._bindTexture(renderer.getTextureID());
+                GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, width);
                 for (Rectangle dirtyRect : dirtyRects) {
                     GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, dirtyRect.x);
                     GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, dirtyRect.y);
@@ -176,7 +176,7 @@ public class MCEFBrowser extends CefBrowserOsr {
                     } else if (popupDrawn) {
                         // else, a use copy of the popup graphics, as it needs to remain visible
                         // and for some reason that I do not for the life of me understand, chromium does not seem to keep this data in memory outside of the paint loop, meaning it has to be copied around, which wastes performance
-                        RenderSystem.pixelStore(GL_UNPACK_ROW_LENGTH, popupSize.width);
+                        GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, popupSize.width);
                         GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
                         GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, 0);
                         renderer.onPaint(popupGraphics, popupSize.x, popupSize.y, popupSize.width, popupSize.height);
@@ -185,11 +185,11 @@ public class MCEFBrowser extends CefBrowserOsr {
             }
         } else {
             if (renderer.getTextureID() == 0) return;
-            RenderSystem.bindTexture(renderer.getTextureID());
+            GlStateManager._bindTexture(renderer.getTextureID());
             int start = buffer.capacity();
             int end = 0;
             for (Rectangle dirtyRect : dirtyRects) {
-                RenderSystem.pixelStore(GL_UNPACK_ROW_LENGTH, popupSize.width);
+                GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, popupSize.width);
                 GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, dirtyRect.x);
                 GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, dirtyRect.y);
                 renderer.onPaint(buffer, popupSize.x + dirtyRect.x, popupSize.y + dirtyRect.y, dirtyRect.width, dirtyRect.height);
