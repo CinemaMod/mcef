@@ -11,8 +11,7 @@
     "CefInitMixin",
     "CefRenderUpdateMixin",
     "CefWindowsShutdownMixin",
-    "ExampleTextureMixin",
-    "ScreenMixin"
+    "ExampleTextureMixin"
   ],
   "injectors": {
     "defaultRequire": 1

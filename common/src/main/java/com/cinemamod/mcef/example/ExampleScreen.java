@@ -109,8 +109,8 @@ public class ExampleScreen extends Screen {
                 this.exampleLocation,
                 BROWSER_DRAW_OFFSET, BROWSER_DRAW_OFFSET,
                 0, 0,
-                width - BROWSER_DRAW_OFFSET, height - BROWSER_DRAW_OFFSET,
-                width - BROWSER_DRAW_OFFSET, height - BROWSER_DRAW_OFFSET,
+                width - BROWSER_DRAW_OFFSET * 2, height - BROWSER_DRAW_OFFSET * 2,
+                width - BROWSER_DRAW_OFFSET * 2, height - BROWSER_DRAW_OFFSET * 2,
                 Color.white.getRGB()
         );
     }
