@@ -22,8 +22,8 @@ package com.cinemamod.mcef.example;
 
 import com.cinemamod.mcef.MCEF;
 import com.cinemamod.mcef.MCEFBrowser;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -33,14 +33,22 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ARGB;
+
+import java.awt.*;
+import java.util.UUID;
 
 public class ExampleScreen extends Screen {
     private static final int BROWSER_DRAW_OFFSET = 20;
 
     private MCEFBrowser browser;
+    protected ResourceLocation exampleLocation;
+    protected ExampleTexture exampleTexture;
 
-    protected ExampleScreen(Component component) {
+    public ExampleScreen(Component component) {
         super(component);
     }
 
@@ -48,10 +56,16 @@ public class ExampleScreen extends Screen {
     protected void init() {
         super.init();
         if (browser == null) {
+            exampleLocation = ResourceLocation.fromNamespaceAndPath("example", "frame_" + UUID.randomUUID().toString().replace("-", ""));
+
+            exampleTexture = new ExampleTexture(-1, this.exampleLocation.toString());
             String url = "https://www.google.com";
-            boolean transparent = true;
+            boolean transparent = false;
             browser = MCEF.createBrowser(url, transparent);
             resizeBrowser();
+
+            Minecraft.getInstance().getTextureManager().register(this.exampleLocation, this.exampleTexture);
+
         }
     }
 
@@ -77,6 +91,10 @@ public class ExampleScreen extends Screen {
         }
     }
 
+    private void updateFrame() {
+        this.exampleTexture.setId(this.browser.getRenderer().getTextureID());
+    }
+
     @Override
     public void resize(Minecraft minecraft, int i, int j) {
         super.resize(minecraft, i, j);
@@ -92,20 +110,16 @@ public class ExampleScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int i, int j, float f) {
         super.render(guiGraphics, i, j, f);
-//        RenderSystem.disableDepthTest();
-//        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-        GpuTextureView texture = RenderSystem.getShaderTexture(browser.getRenderer().getTextureID());
-        RenderSystem.setShaderTexture(0, texture);
-        Tesselator t = Tesselator.getInstance();
-        BufferBuilder buffer = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-        buffer.addVertex(BROWSER_DRAW_OFFSET, height - BROWSER_DRAW_OFFSET, 0).setUv(0.0f, 1.0f).setColor(255, 255, 255, 255);
-        buffer.addVertex(width - BROWSER_DRAW_OFFSET, height - BROWSER_DRAW_OFFSET, 0).setUv(1.0f, 1.0f).setColor(255, 255, 255, 255);
-        buffer.addVertex(width - BROWSER_DRAW_OFFSET, BROWSER_DRAW_OFFSET, 0).setUv(1.0f, 0.0f).setColor(255, 255, 255, 255);
-        buffer.addVertex(BROWSER_DRAW_OFFSET, BROWSER_DRAW_OFFSET, 0).setUv(0.0f, 0.0f).setColor(255, 255, 255, 255);
-        MeshData data = buffer.build();
-//        BufferUploader.drawWithShader(buffer.build());
-        RenderSystem.setShaderTexture(0, texture);
-//        RenderSystem.enableDepthTest();
+        this.updateFrame();
+        guiGraphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                this.exampleLocation,
+                BROWSER_DRAW_OFFSET, BROWSER_DRAW_OFFSET,
+                0, 0,
+                width - BROWSER_DRAW_OFFSET, height - BROWSER_DRAW_OFFSET,
+                width - BROWSER_DRAW_OFFSET, height - BROWSER_DRAW_OFFSET,
+                Color.white.getRGB()
+        );
     }
 
     @Override
