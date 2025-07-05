@@ -18,16 +18,6 @@ public class ExampleTexture extends AbstractTexture {
         this.textureView = device.createTextureView(this.texture);
     }
 
-    @Override
-    public void setFilter(boolean $$0, boolean $$1) {
-        // do nothing
-    }
-
-    @Override
-    public void setClamp(boolean $$0) {
-        // do nothing
-    }
-
     public void setId(int id) {
         this.glTexture.setGlId(id);
     }

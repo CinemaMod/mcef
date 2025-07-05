@@ -38,23 +38,7 @@ public class ExampleGlTexture extends GlTexture {
     }
 
     public void setGlId(int id) {
-        ExampleTextureMixin mixin = (ExampleTextureMixin) (Object) this;
-        mixin.setId(id);
-    }
-
-    @Override
-    public void addViews() {
-        // do nothing
-    }
-
-    @Override
-    public void removeViews() {
-        // do nothing
-    }
-
-    @Override
-    public void close() {
-        // do nothing
+        ((ExampleTextureMixin) this).setId(id);
     }
 
 }
