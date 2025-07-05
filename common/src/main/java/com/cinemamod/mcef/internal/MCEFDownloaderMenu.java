@@ -27,6 +27,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
+import org.joml.Matrix3x2fStack;
 
 public class MCEFDownloaderMenu extends Screen {
     private final Screen menu;
@@ -38,19 +39,19 @@ public class MCEFDownloaderMenu extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
-        double cx = width / 2d;
-        double cy = height / 2d;
+        //renderBackground(graphics, mouseX, mouseY, partialTick);
+        float cx = width / 2f;
+        float cy = height / 2f;
 
-        double progressBarHeight = 14;
-        double progressBarWidth = width / 3d; // TODO: base off screen with (1/3 of screen)
+        float progressBarHeight = 14;
+        float progressBarWidth = width / 3f; // TODO: base off screen with (1/3 of screen)
 
-        PoseStack poseStack = graphics.pose();
+        Matrix3x2fStack poseStack = graphics.pose();
 
         /* Draw Progress Bar */
-        poseStack.pushPose();
-        poseStack.translate(cx, cy, 0);
-        poseStack.translate(-progressBarWidth / 2d, -progressBarHeight / 2d, 0);
+        poseStack.pushMatrix();
+        poseStack.translate(cx, cy);
+        poseStack.translate(-progressBarWidth / 2f, -progressBarHeight / 2f);
         graphics.fill( // bar border
                 0, 0,
                 (int) progressBarWidth,
@@ -69,7 +70,7 @@ public class MCEFDownloaderMenu extends Screen {
                 (int) progressBarHeight - 4,
                 -1
         );
-        poseStack.popPose();
+        poseStack.popMatrix();
 
         // putting this here incase I want to re-add a third line later on
         // allows me to generalize the code to not care about line count
@@ -81,11 +82,10 @@ public class MCEFDownloaderMenu extends Screen {
         /* Draw Text */
         // calculate offset for the top line
         int oSet = ((font.lineHeight / 2) + ((font.lineHeight + 2) * (text.length + 2))) + 4;
-        poseStack.pushPose();
+        poseStack.pushMatrix();
         poseStack.translate(
                 (int) (cx),
-                (int) (cy - oSet),
-                0
+                (int) (cy - oSet)
         );
         // draw menu name
         graphics.drawString(
@@ -98,10 +98,10 @@ public class MCEFDownloaderMenu extends Screen {
         int index = 0;
         for (String s : text) {
             if (index == 1) {
-                poseStack.translate(0, font.lineHeight + 2, 0);
+                poseStack.translate(0, font.lineHeight + 2);
             }
 
-            poseStack.translate(0, font.lineHeight + 2, 0);
+            poseStack.translate(0, font.lineHeight + 2);
             graphics.drawString(
                     font,
                     s,
@@ -110,7 +110,7 @@ public class MCEFDownloaderMenu extends Screen {
             );
             index++;
         }
-        poseStack.popPose();
+        poseStack.pushMatrix();
 
         // TODO: if listener.isFailed(), draw some "Failed to initialize MCEF" text with an "OK" button to proceed
     }

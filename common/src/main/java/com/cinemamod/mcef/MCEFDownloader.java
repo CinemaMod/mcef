@@ -79,7 +79,6 @@ public class MCEFDownloader {
     /**
      * @return true if the jcef build checksum file matches the remote checksum file (for the {@link MCEFDownloader#javaCefCommitHash}),
      * false if the jcef build checksum file did not exist or did not match; this means we should redownload JCEF
-     * @throws IOException
      */
     public boolean downloadJavaCefChecksum() throws IOException {
         File mcefLibrariesPath = new File(System.getProperty("mcef.libraries.path"));

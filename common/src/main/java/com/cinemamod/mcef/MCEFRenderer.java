@@ -20,6 +20,7 @@
 
 package com.cinemamod.mcef;
 
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import java.nio.ByteBuffer;
@@ -36,10 +37,10 @@ public class MCEFRenderer {
 
     public void initialize() {
         textureID[0] = glGenTextures();
-        RenderSystem.bindTexture(textureID[0]);
-        RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        RenderSystem.bindTexture(0);
+        GlStateManager._bindTexture(textureID[0]);
+        GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        GlStateManager._bindTexture(0);
     }
 
     public int getTextureID() {
@@ -59,11 +60,11 @@ public class MCEFRenderer {
 
     protected void onPaint(ByteBuffer buffer, int width, int height) {
         if (textureID[0] == 0) return;
-        if (transparent) RenderSystem.enableBlend();
-        RenderSystem.bindTexture(textureID[0]);
-        RenderSystem.pixelStore(GL_UNPACK_ROW_LENGTH, width);
-        RenderSystem.pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
-        RenderSystem.pixelStore(GL_UNPACK_SKIP_ROWS, 0);
+        if (transparent) GlStateManager._enableBlend();
+        GlStateManager._bindTexture(textureID[0]);
+        GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, width);
+        GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
+        GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, 0);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
                 GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
     }

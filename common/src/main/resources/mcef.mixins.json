@@ -10,7 +10,8 @@
     "CefDownloadMixin",
     "CefInitMixin",
     "CefRenderUpdateMixin",
-    "CefWindowsShutdownMixin"
+    "CefWindowsShutdownMixin",
+    "ExampleTextureMixin"
   ],
   "injectors": {
     "defaultRequire": 1
