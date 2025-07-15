@@ -21,6 +21,7 @@
 
 package net.ccbluex.liquidbounce.mcef.utils;
 
+import com.google.common.base.Suppliers;
 import net.ccbluex.liquidbounce.mcef.listeners.OkHttpProgressInterceptor;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFProgressListener;
 import okhttp3.OkHttpClient;
@@ -31,13 +32,31 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
 import java.io.*;
+import java.util.function.Supplier;
 
 public class FileUtils {
 
+    private FileUtils() {}
+
+    private static final Supplier<OkHttpClient> DEFAULT = Suppliers.memoize(() ->
+        new OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+    );
+
+    private static OkHttpClient client = null;
+
+    public static void setOkHttpClient(OkHttpClient client) {
+        FileUtils.client = client;
+    }
+
+    private static OkHttpClient getClient() {
+        return client != null ? client : DEFAULT.get();
+    }
+
     public static void downloadFile(MCEFProgressListener progressListener, String task, String urlString, File outputFile) throws IOException {
-        var client = new OkHttpClient.Builder()
-                .followRedirects(true)
-                .followSslRedirects(true)
+        var client = getClient().newBuilder()
                 .addNetworkInterceptor(new OkHttpProgressInterceptor((bytesRead, contentLength, done) -> {
                     if (contentLength > 0) {
                         float percentComplete = (float) bytesRead / contentLength;
@@ -80,8 +99,8 @@ public class FileUtils {
             progressListener.onFileStart(task);
 
             try (var source = body.source();
-                 var sink = Okio.buffer(Okio.sink(outputFile))) {
-                sink.writeAll(source);
+                 var sink = Okio.sink(outputFile)) {
+                source.readAll(sink);
             }
         } catch (IOException e) {
             throw new IOException(String.format(
@@ -102,6 +121,7 @@ public class FileUtils {
         progressListener.onProgressUpdate(task, 0.0f);
         outputDirectory.mkdirs();
 
+        byte[] buffer = new byte[8192];
         try (TarArchiveInputStream tarInput = new TarArchiveInputStream(
                 new GzipCompressorInputStream(new FileInputStream(tarGzFile)))) {
 
@@ -111,13 +131,12 @@ public class FileUtils {
             progressListener.onFileStart(task);
 
             TarArchiveEntry entry;
-            while ((entry = tarInput.getNextTarEntry()) != null) {
+            while ((entry = tarInput.getNextEntry()) != null) {
                 if (!entry.isDirectory()) {
                     File outputFile = new File(outputDirectory, entry.getName());
                     outputFile.getParentFile().mkdirs();
 
                     try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outputFile))) {
-                        byte[] buffer = new byte[8192];
                         int bytesRead;
                         while ((bytesRead = tarInput.read(buffer)) != -1) {
                             outputStream.write(buffer, 0, bytesRead);
