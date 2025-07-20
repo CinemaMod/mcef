@@ -32,7 +32,7 @@ repositories {
 ```
 ```gradle
 dependencies {
-    modImplementation 'com.github.CCBlueX:mcef:3.0.0-1.21.4'
+    modImplementation 'com.github.CCBlueX:mcef:3.1.0-1.21.4'
 }
 ```
 
