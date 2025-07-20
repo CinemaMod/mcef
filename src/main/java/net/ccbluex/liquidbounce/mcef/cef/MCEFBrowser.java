@@ -23,6 +23,7 @@ package net.ccbluex.liquidbounce.mcef.cef;
 
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.ccbluex.liquidbounce.mcef.MCEFPlatform;
 import net.ccbluex.liquidbounce.mcef.glfw.MCEFGlfwCursorHelper;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFCursorChangeListener;
@@ -32,6 +33,7 @@ import org.cef.callback.CefDragData;
 import org.cef.event.CefKeyEvent;
 import org.cef.event.CefMouseEvent;
 import org.cef.event.CefMouseWheelEvent;
+import org.cef.handler.CefAcceleratedPaintInfo;
 import org.cef.misc.CefCursorType;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryUtil;
@@ -85,9 +87,10 @@ public class MCEFBrowser extends CefBrowserOsr {
     private int mouseButton;
 
     private final boolean isMacOs = MCEFPlatform.getPlatform().isMacOS();
+    private final boolean isWindows = MCEFPlatform.getPlatform().isWindows();
 
-    public MCEFBrowser(MCEFClient client, String url, boolean transparent, int frameRate) {
-        super(client.getHandle(), url, transparent, null, new MCEFBrowserSettings(frameRate));
+    public MCEFBrowser(MCEFClient client, String url, boolean transparent, MCEFBrowserSettings browserSettings) {
+        super(client.getHandle(), url, transparent, null, browserSettings);
         renderer = new MCEFRenderer(transparent);
         cursorChangeListener = (cefCursorID) -> setCursor(CefCursorType.fromId(cefCursorID));
 
@@ -134,7 +137,7 @@ public class MCEFBrowser extends CefBrowserOsr {
         if (dirtyRects.length == 0) {
             return;
         }
-
+        
         if (!popup) {
             if (lastWidth != width || lastHeight != height) {
                 lastWidth = width;
@@ -205,6 +208,45 @@ public class MCEFBrowser extends CefBrowserOsr {
 
             popupDrawn = true;
         }
+        super.onPaint(browser, popup, dirtyRects, buffer, width, height);
+    }
+
+    @Override
+    public void onAcceleratedPaint(CefBrowser browser, boolean popup, Rectangle[] dirtyRects,
+                                   CefAcceleratedPaintInfo info) {
+        // nothing to update
+        if (dirtyRects.length == 0) {
+            return;
+        }
+
+        // refuse 1x1 rectangles
+        if (info.width <= 1 || info.height <= 1 ||
+                dirtyRects[0].width <= 1 || dirtyRects[0].height <= 1) {
+            return;
+        }
+
+        var width = info.width;
+        var height = info.height;
+
+        if (lastWidth != width || lastHeight != height) {
+            var rect = dirtyRects[0];
+
+            if (rect.width == width && rect.height == height && rect.x == 0 && rect.y == 0) {
+                lastWidth = width;
+                lastHeight = height;
+            } else {
+                // Likely an outdated paint-call
+                return;
+            }
+        }
+
+        if (!popup) {
+            renderer.onAcceleratedPaint(info, width, height);
+        } else {
+            MCEF.INSTANCE.LOGGER.warn("Accelerated paint for popups is not supported in MCEF.");
+        }
+
+        super.onAcceleratedPaint(browser, popup, dirtyRects, info);
     }
 
     public void resize(int width, int height) {
@@ -314,6 +356,10 @@ public class MCEFBrowser extends CefBrowserOsr {
         sendMouseWheelEvent(event);
     }
 
+    public void clear() {
+        invalidate();
+    }
+
     // Drag & drop
     @Override
     public boolean startDragging(CefBrowser browser, CefDragData dragData, int mask, int x, int y) {
@@ -355,14 +401,14 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     // Closing
     public void close() {
-        renderer.cleanup();
+        renderer.close();
         cursorChangeListener.onCursorChange(0);
         super.close(true);
     }
 
     @Override
     protected void finalize() throws Throwable {
-        RenderSystem.recordRenderCall(renderer::cleanup);
+        RenderSystem.recordRenderCall(renderer::close);
         super.finalize();
     }
 

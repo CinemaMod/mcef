@@ -21,10 +21,7 @@
 
 package net.ccbluex.liquidbounce.mcef;
 
-import net.ccbluex.liquidbounce.mcef.cef.CefHelper;
-import net.ccbluex.liquidbounce.mcef.cef.MCEFApp;
-import net.ccbluex.liquidbounce.mcef.cef.MCEFBrowser;
-import net.ccbluex.liquidbounce.mcef.cef.MCEFClient;
+import net.ccbluex.liquidbounce.mcef.cef.*;
 import net.minecraft.client.MinecraftClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,9 +122,12 @@ public enum MCEF {
      * Creates a new Chromium web browser with some starting URL. Can set it to be transparent rendering.
      * @return the {@link MCEFBrowser} web browser instance
      */
-    public MCEFBrowser createBrowser(String url, boolean transparent, int frameRate) {
+    public MCEFBrowser createBrowser(String url, boolean transparent, MCEFBrowserSettings browserSettings) {
         assertInitialized();
-        MCEFBrowser browser = new MCEFBrowser(client, url, transparent, frameRate);
+        if (browserSettings == null) {
+            browserSettings = new MCEFBrowserSettings(60, false);
+        }
+        MCEFBrowser browser = new MCEFBrowser(client, url, transparent, browserSettings);
         browser.setCloseAllowed();
         browser.createImmediately();
         return browser;
@@ -139,9 +139,13 @@ public enum MCEF {
      * Can set it to be transparent rendering.
      * @return the {@link MCEFBrowser} web browser instance
      */
-    public MCEFBrowser createBrowser(String url, boolean transparent, int width, int height, int frameRate) {
+    public MCEFBrowser createBrowser(String url, boolean transparent, int width, int height,
+                                     MCEFBrowserSettings browserSettings) {
         assertInitialized();
-        MCEFBrowser browser = new MCEFBrowser(client, url, transparent, frameRate);
+        if (browserSettings == null) {
+            browserSettings = new MCEFBrowserSettings(60, false);
+        }
+        MCEFBrowser browser = new MCEFBrowser(client, url, transparent, browserSettings);
         browser.setCloseAllowed();
         browser.createImmediately();
         browser.resize(width, height);

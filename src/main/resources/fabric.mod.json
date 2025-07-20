@@ -13,6 +13,6 @@
   "mixins": [],
   "depends": {
     "fabricloader": ">=${loader_version}",
-    "minecraft": ["1.21", "1.21.1", "1.21.2", "1.21.3", "1.21.4"]
+    "minecraft": ["${minecraft_version}"]
   }
 }

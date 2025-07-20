@@ -60,7 +60,7 @@ dependencies {
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    implementation "com.squareup.okhttp3:okhttp:5.0.0-alpha.14"
+    implementation "com.squareup.okhttp3:okhttp:5.0.0-alpha.16"
 }
 
 sourceSets {
@@ -117,6 +117,7 @@ jar {
         rename { "${it}_${project.base.archivesName.get()}"}
     }
     from("$buildDir/jcef.commit")
+    from sourceSets.jcef.output
 }
 
 java {
