@@ -131,7 +131,9 @@ public class FileUtils {
             progressListener.onFileStart(task);
 
             TarArchiveEntry entry;
-            while ((entry = tarInput.getNextEntry()) != null) {
+            // We use [getNextTarEntry] by purpose because Lunar Client is using an outdated version
+            // of Apache Commons Compress
+            while ((entry = tarInput.getNextTarEntry()) != null) {
                 if (!entry.isDirectory()) {
                     File outputFile = new File(outputDirectory, entry.getName());
                     outputFile.getParentFile().mkdirs();
