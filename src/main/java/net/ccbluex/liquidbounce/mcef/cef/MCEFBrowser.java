@@ -22,11 +22,11 @@
 package net.ccbluex.liquidbounce.mcef.cef;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.ccbluex.liquidbounce.mcef.MCEFPlatform;
 import net.ccbluex.liquidbounce.mcef.glfw.MCEFGlfwCursorHelper;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFCursorChangeListener;
+import net.minecraft.util.Identifier;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefBrowserOsr;
 import org.cef.callback.CefDragData;
@@ -99,6 +99,25 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     public MCEFRenderer getRenderer() {
         return renderer;
+    }
+
+    /**
+     * Convenience method to get the ResourceLocation for this browser's texture.
+     * This can be used directly with GuiGraphics rendering methods.
+     *
+     * @return The Identifier for this browser's texture, or null if not initialized
+     */
+    public Identifier getTextureLocation() {
+        return renderer != null ? renderer.getIdentifier() : null;
+    }
+
+    /**
+     * Check if the browser's texture is ready for rendering.
+     *
+     * @return true if the texture is initialized and ready to be rendered
+     */
+    public boolean isTextureReady() {
+        return renderer != null && renderer.isTextureReady();
     }
 
     public MCEFCursorChangeListener getCursorChangeListener() {
