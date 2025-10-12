@@ -21,6 +21,7 @@
 
 package net.ccbluex.liquidbounce.mcef.cef;
 
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.ccbluex.liquidbounce.mcef.MCEF;
 import org.cef.handler.CefAcceleratedPaintInfo;
@@ -51,13 +52,13 @@ public class MCEFRenderer implements Closeable {
      * Initializes the renderer by generating a texture ID and setting up the texture parameters.
      */
     public void initialize() {
-        RenderSystem.assertOnRenderThreadOrInit();
+//        RenderSystem.assertOnRenderThread();
 
         textureID[0] = GL11.glGenTextures();
-        RenderSystem.bindTexture(textureID[0]);
-        RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        RenderSystem.bindTexture(0);
+        GlStateManager._bindTexture(textureID[0]);
+        GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        GlStateManager._bindTexture(0);
 
         sharedTextureID[0] = 0;
     }
@@ -66,6 +67,7 @@ public class MCEFRenderer implements Closeable {
      * Returns the texture ID for the renderer. If accelerated rendering is enabled, it returns the shared texture ID.
      * @return OpenGL texture ID
      */
+    @Deprecated(since = "1.21.5")
     public int getTextureID() {
         if (isAccelerated) {
             return sharedTextureID[0];
@@ -131,7 +133,7 @@ public class MCEFRenderer implements Closeable {
         RenderSystem.assertOnRenderThread();
 
         if (transparent) {
-            RenderSystem.enableBlend();
+            GlStateManager._enableBlend();
         }
 
         // Create a new texture that we can copy the shared texture into. Unfortunately, textures are immutable,
@@ -158,7 +160,7 @@ public class MCEFRenderer implements Closeable {
                 info.shared_texture_handle
         );
 
-        RenderSystem.bindTexture(sharedTexture);
+        GlStateManager._bindTexture(sharedTexture);
 
         // Allocate immutable storage for the texture for the data from the memory object
         // Use GL_RGBA8 since it is 4 bytes
@@ -174,7 +176,7 @@ public class MCEFRenderer implements Closeable {
         glFinish();
 
         if (sharedTextureID[0] != 0) {
-            RenderSystem.deleteTexture(sharedTextureID[0]);
+            GlStateManager._deleteTexture(sharedTextureID[0]);
         }
 
         glDeleteMemoryObjectsEXT(memoryObject);
@@ -184,7 +186,7 @@ public class MCEFRenderer implements Closeable {
         unpainted = false;
         isBGRA = true;
 
-        RenderSystem.bindTexture(0);
+        GlStateManager._bindTexture(0);
     }
 
     /**
@@ -203,13 +205,13 @@ public class MCEFRenderer implements Closeable {
         RenderSystem.assertOnRenderThread();
 
         if (transparent) {
-            RenderSystem.enableBlend();
+            GlStateManager._enableBlend();
         }
 
-        RenderSystem.bindTexture(textureID[0]);
-        RenderSystem.pixelStore(GL_UNPACK_ROW_LENGTH, width);
-        RenderSystem.pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
-        RenderSystem.pixelStore(GL_UNPACK_SKIP_ROWS, 0);
+        GlStateManager._bindTexture(textureID[0]);
+        GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, width);
+        GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
+        GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, 0);
 
         GL11.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
                 GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
@@ -244,12 +246,12 @@ public class MCEFRenderer implements Closeable {
         RenderSystem.assertOnRenderThread();
 
         if (textureID[0] != 0) {
-            RenderSystem.deleteTexture(textureID[0]);
+            GlStateManager._deleteTexture(textureID[0]);
             textureID[0] = 0;
         }
 
         if (sharedTextureID[0] != 0) {
-            RenderSystem.deleteTexture(sharedTextureID[0]);
+            GlStateManager._deleteTexture(sharedTextureID[0]);
             sharedTextureID[0] = 0;
         }
 
