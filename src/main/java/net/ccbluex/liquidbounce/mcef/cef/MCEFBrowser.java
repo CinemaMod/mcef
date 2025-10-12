@@ -21,7 +21,7 @@
 
 package net.ccbluex.liquidbounce.mcef.cef;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.ccbluex.liquidbounce.mcef.MCEFPlatform;
@@ -94,7 +94,7 @@ public class MCEFBrowser extends CefBrowserOsr {
         renderer = new MCEFRenderer(transparent);
         cursorChangeListener = (cefCursorID) -> setCursor(CefCursorType.fromId(cefCursorID));
 
-        RenderSystem.recordRenderCall(renderer::initialize);
+        mc.send(renderer::initialize);
     }
 
     public MCEFRenderer getRenderer() {
@@ -408,7 +408,7 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     @Override
     protected void finalize() throws Throwable {
-        RenderSystem.recordRenderCall(renderer::close);
+        mc.send(renderer::close);
         super.finalize();
     }
 
