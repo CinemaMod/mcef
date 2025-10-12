@@ -30,10 +30,12 @@ import org.lwjgl.opengl.GL11;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL12.*;
 import static org.lwjgl.opengl.EXTMemoryObject.*;
-import static org.lwjgl.opengl.EXTMemoryObjectWin32.*;
+import static org.lwjgl.opengl.EXTMemoryObjectWin32.GL_HANDLE_TYPE_D3D11_IMAGE_EXT;
+import static org.lwjgl.opengl.EXTMemoryObjectWin32.glImportMemoryWin32HandleEXT;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL12.GL_BGRA;
+import static org.lwjgl.opengl.GL12.GL_UNSIGNED_INT_8_8_8_8_REV;
 
 public class MCEFRenderer implements Closeable {
 
@@ -52,15 +54,31 @@ public class MCEFRenderer implements Closeable {
      * Initializes the renderer by generating a texture ID and setting up the texture parameters.
      */
     public void initialize() {
-//        RenderSystem.assertOnRenderThread();
+        RenderSystem.assertOnRenderThread();
 
-        textureID[0] = GL11.glGenTextures();
-        GlStateManager._bindTexture(textureID[0]);
+        textureId(GL11.glGenTextures());
+        GlStateManager._bindTexture(textureId());
         GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         GlStateManager._texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         GlStateManager._bindTexture(0);
 
-        sharedTextureID[0] = 0;
+        sharedTextureId(0);
+    }
+
+    private int textureId() {
+        return textureID[0];
+    }
+
+    private void textureId(int v) {
+        textureID[0] = v;
+    }
+
+    private int sharedTextureId() {
+        return sharedTextureID[0];
+    }
+
+    private void sharedTextureId(int v) {
+        sharedTextureID[0] = v;
     }
 
     /**
@@ -70,9 +88,9 @@ public class MCEFRenderer implements Closeable {
     @Deprecated(since = "1.21.5")
     public int getTextureID() {
         if (isAccelerated) {
-            return sharedTextureID[0];
+            return sharedTextureId();
         } else {
-            return textureID[0];
+            return textureId();
         }
     }
 
@@ -81,11 +99,11 @@ public class MCEFRenderer implements Closeable {
      * which means no paint calls have been made since the last initialization or cleanup.
      */
     public boolean isUnpainted() {
-        if (isAccelerated && sharedTextureID[0] == 0) {
+        if (isAccelerated && sharedTextureId() == 0) {
             return false;
         }
 
-        if (textureID[0] == 0) {
+        if (textureId() == 0) {
             return false;
         }
 
@@ -175,13 +193,13 @@ public class MCEFRenderer implements Closeable {
         );
         glFinish();
 
-        if (sharedTextureID[0] != 0) {
-            GlStateManager._deleteTexture(sharedTextureID[0]);
+        if (sharedTextureId() != 0) {
+            GlStateManager._deleteTexture(sharedTextureId());
         }
 
         glDeleteMemoryObjectsEXT(memoryObject);
 
-        sharedTextureID[0] = sharedTexture;
+        sharedTextureId(sharedTexture);
         isAccelerated = true;
         unpainted = false;
         isBGRA = true;
@@ -198,7 +216,7 @@ public class MCEFRenderer implements Closeable {
      * @param height The height of the texture.
      */
     protected void onPaint(ByteBuffer buffer, int width, int height) {
-        if (textureID[0] == 0) {
+        if (textureId() == 0) {
             return;
         }
 
@@ -208,7 +226,7 @@ public class MCEFRenderer implements Closeable {
             GlStateManager._enableBlend();
         }
 
-        GlStateManager._bindTexture(textureID[0]);
+        GlStateManager._bindTexture(textureId());
         GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, width);
         GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
         GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, 0);
@@ -245,14 +263,14 @@ public class MCEFRenderer implements Closeable {
     public void close() {
         RenderSystem.assertOnRenderThread();
 
-        if (textureID[0] != 0) {
-            GlStateManager._deleteTexture(textureID[0]);
-            textureID[0] = 0;
+        if (textureId() != 0) {
+            GlStateManager._deleteTexture(textureId());
+            textureId(0);
         }
 
-        if (sharedTextureID[0] != 0) {
-            GlStateManager._deleteTexture(sharedTextureID[0]);
-            sharedTextureID[0] = 0;
+        if (sharedTextureId() != 0) {
+            GlStateManager._deleteTexture(sharedTextureId());
+            sharedTextureId(0);
         }
 
         isAccelerated = false;
