@@ -24,11 +24,12 @@ package net.ccbluex.liquidbounce.mcef.glfw;
 import org.cef.misc.CefCursorType;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.Map;
 
 public class MCEFGlfwCursorHelper {
 
-    private static final HashMap<CefCursorType, Long> CEF_TO_GLFW_CURSORS = new HashMap<>();
+    private static final Map<CefCursorType, Long> CEF_TO_GLFW_CURSORS = new EnumMap<>(CefCursorType.class);
 
     /**
      * Helper method to get a GLFW cursor handle for the given {@link CefCursorType} cursor type

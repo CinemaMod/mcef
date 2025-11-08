@@ -21,57 +21,98 @@
 
 package net.ccbluex.liquidbounce.mcef.cef;
 
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.textures.TextureFormat;
 import net.ccbluex.liquidbounce.mcef.MCEF;
+import net.minecraft.client.texture.GlTexture;
+import net.minecraft.util.Identifier;
 import org.cef.handler.CefAcceleratedPaintInfo;
-import org.lwjgl.opengl.GL11;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL12.*;
+import static net.ccbluex.liquidbounce.mcef.MCEF.mc;
 import static org.lwjgl.opengl.EXTMemoryObject.*;
-import static org.lwjgl.opengl.EXTMemoryObjectWin32.*;
+import static org.lwjgl.opengl.EXTMemoryObjectWin32.GL_HANDLE_TYPE_D3D11_IMAGE_EXT;
+import static org.lwjgl.opengl.EXTMemoryObjectWin32.glImportMemoryWin32HandleEXT;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL12.GL_BGRA;
+import static org.lwjgl.opengl.GL12.GL_UNSIGNED_INT_8_8_8_8_REV;
 
 public class MCEFRenderer implements Closeable {
 
     private final boolean transparent;
-    private final int[] textureID = new int[1];
-    private final int[] sharedTextureID = new int[1];
+    private @Nullable GpuTexture texture = null;
+    private @Nullable GpuTexture sharedTexture = null;
+    private int textureWidth = 0;
+    private int textureHeight = 0;
+
+    // ResourceLocation for this renderer's texture
+    private final Identifier identifier;
+    private MCEFDirectTexture directTexture;
+    private boolean textureRegistered = false;
+
     private boolean isBGRA = false;
     private boolean unpainted = true;
     private boolean isAccelerated = false;
 
     protected MCEFRenderer(boolean transparent) {
         this.transparent = transparent;
+        // Generate a unique ResourceLocation for this renderer
+        String uniqueId = UUID.randomUUID().toString().toLowerCase().replace("-", "");
+        this.identifier = Identifier.of("mcef", "browser_" + uniqueId);
     }
 
     /**
      * Initializes the renderer by generating a texture ID and setting up the texture parameters.
      */
     public void initialize() {
-        RenderSystem.assertOnRenderThreadOrInit();
-
-        textureID[0] = GL11.glGenTextures();
-        RenderSystem.bindTexture(textureID[0]);
-        RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        RenderSystem.texParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        RenderSystem.bindTexture(0);
-
-        sharedTextureID[0] = 0;
+        // Create and register the direct texture wrapper with Minecraft's TextureManager
+        directTexture = new MCEFDirectTexture();
+        mc.getTextureManager().registerTexture(identifier, directTexture);
+        textureRegistered = true;
     }
 
     /**
      * Returns the texture ID for the renderer. If accelerated rendering is enabled, it returns the shared texture ID.
      * @return OpenGL texture ID
      */
+    @Deprecated(since = "1.21.5")
     public int getTextureID() {
+        var texture = getTexture();
+        return !(texture instanceof GlTexture) ? 0 : ((GlTexture) texture).getGlId();
+    }
+
+    /**
+     * Returns the texture for the renderer. If accelerated rendering is enabled, it returns the shared texture.
+     * @return GpuTexture
+     */
+    public @Nullable GpuTexture getTexture() {
         if (isAccelerated) {
-            return sharedTextureID[0];
+            return sharedTexture;
         } else {
-            return textureID[0];
+            return texture;
         }
+    }
+
+    /**
+     * Gets the Identifier that can be used with GuiGraphics and other Minecraft rendering methods.
+     * This Identifier is registered with the TextureManager and points to the browser's texture.
+     */
+    public Identifier getIdentifier() {
+        return identifier;
+    }
+
+    /**
+     * Check if the texture is ready for rendering with GuiGraphics
+     */
+    public boolean isTextureReady() {
+        return isAccelerated ? sharedTexture != null : texture != null && textureRegistered && directTexture != null;
     }
 
     /**
@@ -79,15 +120,23 @@ public class MCEFRenderer implements Closeable {
      * which means no paint calls have been made since the last initialization or cleanup.
      */
     public boolean isUnpainted() {
-        if (isAccelerated && sharedTextureID[0] == 0) {
+        if (isAccelerated && sharedTexture == null) {
             return false;
         }
 
-        if (textureID[0] == 0) {
+        if (texture == null) {
             return false;
         }
 
         return unpainted;
+    }
+
+    public int getTextureWidth() {
+        return textureWidth;
+    }
+
+    public int getTextureHeight() {
+        return textureHeight;
     }
 
     /**
@@ -131,18 +180,18 @@ public class MCEFRenderer implements Closeable {
         RenderSystem.assertOnRenderThread();
 
         if (transparent) {
-            RenderSystem.enableBlend();
+            GlStateManager._enableBlend();
         }
 
         // Create a new texture that we can copy the shared texture into. Unfortunately, textures are immutable,
         // so we have to create a new one
-        var sharedTexture = glGenTextures();
+        var sharedTextureId = glGenTextures();
 
         // Create the memory object handle
         var memoryObject = glCreateMemoryObjectsEXT();
         if (memoryObject == 0) {
             MCEF.INSTANCE.LOGGER.error("Failed to create memory object for shared texture.");
-            glDeleteTextures(sharedTexture);
+            glDeleteTextures(sharedTextureId);
             return;
         }
 
@@ -158,7 +207,7 @@ public class MCEFRenderer implements Closeable {
                 info.shared_texture_handle
         );
 
-        RenderSystem.bindTexture(sharedTexture);
+        GlStateManager._bindTexture(sharedTextureId);
 
         // Allocate immutable storage for the texture for the data from the memory object
         // Use GL_RGBA8 since it is 4 bytes
@@ -173,18 +222,21 @@ public class MCEFRenderer implements Closeable {
         );
         glFinish();
 
-        if (sharedTextureID[0] != 0) {
-            RenderSystem.deleteTexture(sharedTextureID[0]);
+        if (this.sharedTexture != null) {
+            this.sharedTexture.close();
         }
 
         glDeleteMemoryObjectsEXT(memoryObject);
 
-        sharedTextureID[0] = sharedTexture;
+        var sharedTexture = new MCEFDirectTexture();
+        sharedTexture.setDirectTextureId(sharedTextureId, width, height);
+        this.sharedTexture = sharedTexture.getGlTexture();
+
         isAccelerated = true;
         unpainted = false;
         isBGRA = true;
 
-        RenderSystem.bindTexture(0);
+        GlStateManager._bindTexture(0);
     }
 
     /**
@@ -196,25 +248,55 @@ public class MCEFRenderer implements Closeable {
      * @param height The height of the texture.
      */
     protected void onPaint(ByteBuffer buffer, int width, int height) {
-        if (textureID[0] == 0) {
-            return;
-        }
-
         RenderSystem.assertOnRenderThread();
 
-        if (transparent) {
-            RenderSystem.enableBlend();
+        // Create or recreate texture if size changed
+        if (texture == null || textureWidth != width || textureHeight != height) {
+            if (texture != null) {
+                texture.close();
+            }
+
+            // Create new GpuTexture using the device
+            String label = "MCEF Browser Texture " + width + "x" + height;
+            texture = RenderSystem.getDevice().createTexture(
+                    label,
+                    TextureFormat.RGBA8,
+                    width,
+                    height,
+                    1  // mipLevels
+            );
+
+            // Configure texture parameters
+            texture.setTextureFilter(FilterMode.LINEAR, FilterMode.LINEAR, false);
+            texture.setAddressMode(com.mojang.blaze3d.textures.AddressMode.CLAMP_TO_EDGE);
+
+            textureWidth = width;
+            textureHeight = height;
+
+            // Update the direct texture wrapper to point to our new texture
+            if (directTexture != null && texture instanceof GlTexture glTexture) {
+                directTexture.setDirectTextureId(glTexture.getGlId(), width, height);
+            }
         }
 
-        RenderSystem.bindTexture(textureID[0]);
-        RenderSystem.pixelStore(GL_UNPACK_ROW_LENGTH, width);
-        RenderSystem.pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
-        RenderSystem.pixelStore(GL_UNPACK_SKIP_ROWS, 0);
+        if (transparent) {
+            GlStateManager._enableBlend();
+        }
 
-        GL11.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
-                GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
-        isBGRA = false;
-        unpainted = false;
+        if (texture instanceof GlTexture glTexture) {
+            // Bind the texture directly using its GL ID
+            GlStateManager._bindTexture(glTexture.getGlId());
+            GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, width);
+            GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
+            GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, 0);
+
+            // Upload the full texture
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+                    GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
+
+            isBGRA = false;
+            unpainted = false;
+        }
     }
 
     /**
@@ -230,10 +312,12 @@ public class MCEFRenderer implements Closeable {
     protected void onPaint(ByteBuffer buffer, int x, int y, int width, int height) {
         RenderSystem.assertOnRenderThread();
 
-        GL11.glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA,
-                GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
-        isBGRA = false;
-        unpainted = false;
+        if (texture instanceof GlTexture glTexture) {
+            // Bind and update sub-region
+            GlStateManager._bindTexture(glTexture.getGlId());
+            glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA,
+                    GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
+        }
     }
 
     /**
@@ -243,14 +327,18 @@ public class MCEFRenderer implements Closeable {
     public void close() {
         RenderSystem.assertOnRenderThread();
 
-        if (textureID[0] != 0) {
-            RenderSystem.deleteTexture(textureID[0]);
-            textureID[0] = 0;
+        if (texture != null) {
+            texture.close();
         }
 
-        if (sharedTextureID[0] != 0) {
-            RenderSystem.deleteTexture(sharedTextureID[0]);
-            sharedTextureID[0] = 0;
+        if (sharedTexture != null) {
+            sharedTexture.close();
+        }
+
+        // Unregister from TextureManager
+        if (textureRegistered && identifier != null) {
+            mc.getTextureManager().destroyTexture(identifier);
+            textureRegistered = false;
         }
 
         isAccelerated = false;
