@@ -112,7 +112,7 @@ public class MCEFRenderer implements Closeable {
      * Check if the texture is ready for rendering with GuiGraphics
      */
     public boolean isTextureReady() {
-        return texture != null && textureRegistered && directTexture != null;
+        return isAccelerated ? sharedTexture != null : texture != null && textureRegistered && directTexture != null;
     }
 
     /**
