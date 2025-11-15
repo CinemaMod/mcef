@@ -23,6 +23,7 @@ package net.ccbluex.liquidbounce.mcef.cef;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
@@ -207,6 +208,16 @@ public class MCEFRenderer implements Closeable {
                 info.shared_texture_handle
         );
 
+        int error = glGetError();
+
+        if (error != GL_NO_ERROR) {
+            MCEF.INSTANCE.LOGGER.error("glImportMemoryWin32HandleEXT failed with error: {}", error);
+            // Cleanup the resources created so far
+            glDeleteTextures(sharedTextureId);
+            glDeleteMemoryObjectsEXT(memoryObject); // If memory object was created
+            return;
+        }
+
         GlStateManager._bindTexture(sharedTextureId);
 
         // Allocate immutable storage for the texture for the data from the memory object
@@ -222,8 +233,14 @@ public class MCEFRenderer implements Closeable {
         );
         glFinish();
 
-        if (this.sharedTexture != null) {
-            this.sharedTexture.close();
+        switch (this.sharedTexture) {
+            case null -> {}
+            case MCEFDirectTexture.DirectGlTexture t -> {
+                t.close();
+                glDeleteTextures(t.getGlId());
+            }
+            case GlTexture t -> t.close();
+            default -> throw new IllegalStateException("Unexpected value: " + this.sharedTexture);
         }
 
         glDeleteMemoryObjectsEXT(memoryObject);
@@ -268,7 +285,7 @@ public class MCEFRenderer implements Closeable {
 
             // Configure texture parameters
             texture.setTextureFilter(FilterMode.LINEAR, FilterMode.LINEAR, false);
-            texture.setAddressMode(com.mojang.blaze3d.textures.AddressMode.CLAMP_TO_EDGE);
+            texture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 
             textureWidth = width;
             textureHeight = height;

@@ -77,7 +77,7 @@ public class MCEFDirectTexture extends AbstractTexture {
      * Custom GlTexture implementation that wraps an existing OpenGL texture ID
      * without managing its lifecycle.
      */
-    private static class DirectGlTexture extends GlTexture {
+    static class DirectGlTexture extends GlTexture {
         private final int width;
         private final int height;
         
