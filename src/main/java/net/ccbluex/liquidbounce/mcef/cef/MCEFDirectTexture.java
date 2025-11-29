@@ -20,6 +20,8 @@
 
 package net.ccbluex.liquidbounce.mcef.cef;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.texture.AbstractTexture;
 import net.minecraft.client.texture.GlTexture;
@@ -33,9 +35,7 @@ public class MCEFDirectTexture extends AbstractTexture {
     private int width;
     private int height;
     
-    public MCEFDirectTexture() {
-        this.bilinear = false;
-    }
+    public MCEFDirectTexture() {}
     
     /**
      * Directly set the texture to an existing OpenGL texture ID.
@@ -52,10 +52,15 @@ public class MCEFDirectTexture extends AbstractTexture {
         if (textureId > 0) {
             // Create a custom GlTexture that wraps the existing ID
             this.glTexture = new DirectGlTexture(textureId, width, height);
+            if (this.glTextureView != null) {
+                this.glTextureView.close();
+            }
+            this.glTextureView = RenderSystem.getDevice().createTextureView(this.glTexture);
             this.width = width;
             this.height = height;
         } else {
             this.glTexture = null;
+            this.glTextureView = null;
         }
     }
     
@@ -71,6 +76,11 @@ public class MCEFDirectTexture extends AbstractTexture {
     public void close() {
         // Don't close the texture - we don't own it
         this.glTexture = null;
+
+        if (this.glTextureView != null) {
+            this.glTextureView.close();
+            this.glTextureView = null;
+        }
     }
     
     /**
@@ -83,7 +93,10 @@ public class MCEFDirectTexture extends AbstractTexture {
         
         protected DirectGlTexture(int textureId, int width, int height) {
             // Call parent constructor with dummy values, then override
-            super("MCEF Direct Texture", TextureFormat.RGBA8, width, height, 1, textureId);
+            super(
+                GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST,
+                "MCEF Direct Texture", TextureFormat.RGBA8, width, height, 1, 1, textureId
+            );
             this.width = width;
             this.height = height;
             // Mark as not closed

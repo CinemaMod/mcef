@@ -277,9 +277,11 @@ public class MCEFRenderer implements Closeable {
             String label = "MCEF Browser Texture " + width + "x" + height;
             texture = RenderSystem.getDevice().createTexture(
                     label,
+                    GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST,
                     TextureFormat.RGBA8,
                     width,
                     height,
+                    1, // depthOrLayers
                     1  // mipLevels
             );
 

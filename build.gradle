@@ -12,7 +12,7 @@ static def getCheckedOutGitCommitHash(Project mcefParent) {
      *      in case of detached head: the currently checked out commit hash
      *      otherwise: a reference to a file containing the current commit hash
      */
-    def gitHeadFile = new File(gitFolder + "HEAD");
+    def gitHeadFile = new File(gitFolder + "HEAD")
     if (gitHeadFile.exists()) {
         def head = gitHeadFile.text.split(":") // .git/HEAD
         def isCommit = head.length == 1 // e5a7c79edabbf7dd39888442df081b1c9d8e88fd
@@ -83,7 +83,7 @@ processResources {
                 'mod_name': mod_name,
                 'mod_vendor': mod_vendor,
                 'mod_version': mod_version,
-                'minecraft_version': minecraft_version,
+                'minecraft_version': '>=1.21.6 <=1.21.10',
                 'loader_version': loader_version
     }
 
