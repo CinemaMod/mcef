@@ -165,8 +165,8 @@ public class MCEFBrowser extends CefBrowserOsr {
                 // this also sets up the texture size and creates the texture
                 renderer.onPaint(buffer, width, height);
             } else {
-                if (renderer.getTextureID() == 0) return;
-                GlStateManager._bindTexture(renderer.getTextureID());
+                if (renderer.getTextureId() == 0) return;
+                GlStateManager._bindTexture(renderer.getTextureId());
                 GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, width);
                 for (Rectangle dirtyRect : dirtyRects) {
                     GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, dirtyRect.x);
@@ -193,8 +193,8 @@ public class MCEFBrowser extends CefBrowserOsr {
                 }
             }
         } else {
-            if (renderer.getTextureID() == 0) return;
-            GlStateManager._bindTexture(renderer.getTextureID());
+            if (renderer.getTextureId() == 0) return;
+            GlStateManager._bindTexture(renderer.getTextureId());
             int start = buffer.capacity();
             int end = 0;
             for (Rectangle dirtyRect : dirtyRects) {

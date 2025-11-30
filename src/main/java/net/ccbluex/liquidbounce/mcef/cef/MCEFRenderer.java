@@ -23,10 +23,7 @@ package net.ccbluex.liquidbounce.mcef.cef;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.blaze3d.textures.*;
 import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.minecraft.client.texture.GlTexture;
 import net.minecraft.util.Identifier;
@@ -56,6 +53,7 @@ public class MCEFRenderer implements Closeable {
     // ResourceLocation for this renderer's texture
     private final Identifier identifier;
     private MCEFDirectTexture directTexture;
+    private MCEFDirectTexture directSharedTexture;
     private boolean textureRegistered = false;
 
     private boolean isBGRA = false;
@@ -77,20 +75,23 @@ public class MCEFRenderer implements Closeable {
         directTexture = new MCEFDirectTexture();
         mc.getTextureManager().registerTexture(identifier, directTexture);
         textureRegistered = true;
+        directSharedTexture = new MCEFDirectTexture();
     }
 
     /**
-     * Returns the texture ID for the renderer. If accelerated rendering is enabled, it returns the shared texture ID.
+     * Returns the texture ID for the renderer.
+     * If accelerated rendering is enabled, it returns the shared texture ID.
      * @return OpenGL texture ID
      */
     @Deprecated(since = "1.21.5")
-    public int getTextureID() {
+    public int getTextureId() {
         var texture = getTexture();
         return !(texture instanceof GlTexture) ? 0 : ((GlTexture) texture).getGlId();
     }
 
     /**
-     * Returns the texture for the renderer. If accelerated rendering is enabled, it returns the shared texture.
+     * Returns the texture for the renderer.
+     * If accelerated rendering is enabled, it returns the shared texture.
      * @return GpuTexture
      */
     public @Nullable GpuTexture getTexture() {
@@ -98,6 +99,19 @@ public class MCEFRenderer implements Closeable {
             return sharedTexture;
         } else {
             return texture;
+        }
+    }
+
+    /**
+     * Returns the texture view for the renderer.
+     * If accelerated rendering is enabled, it returns the shared texture.
+     * @return GpuTextureView
+     */
+    public @Nullable GpuTextureView getTextureView() {
+        if (isAccelerated) {
+            return directSharedTexture.getGlTextureView();
+        } else {
+            return directTexture.getGlTextureView();
         }
     }
 
@@ -233,21 +247,11 @@ public class MCEFRenderer implements Closeable {
         );
         glFinish();
 
-        switch (this.sharedTexture) {
-            case null -> {}
-            case MCEFDirectTexture.DirectGlTexture t -> {
-                t.close();
-                glDeleteTextures(t.getGlId());
-            }
-            case GlTexture t -> t.close();
-            default -> throw new IllegalStateException("Unexpected value: " + this.sharedTexture);
-        }
-
+        closeTexture(this.sharedTexture);
         glDeleteMemoryObjectsEXT(memoryObject);
 
-        var sharedTexture = new MCEFDirectTexture();
-        sharedTexture.setDirectTextureId(sharedTextureId, width, height);
-        this.sharedTexture = sharedTexture.getGlTexture();
+        this.directSharedTexture.setDirectTextureId(sharedTextureId, width, height);
+        this.sharedTexture = this.directSharedTexture.getGlTexture();
 
         isAccelerated = true;
         unpainted = false;
@@ -346,12 +350,14 @@ public class MCEFRenderer implements Closeable {
     public void close() {
         RenderSystem.assertOnRenderThread();
 
+        this.directTexture.close();
         if (texture != null) {
-            texture.close();
+            closeTexture(texture);
         }
 
+        this.directSharedTexture.close();
         if (sharedTexture != null) {
-            sharedTexture.close();
+            closeTexture(sharedTexture);
         }
 
         // Unregister from TextureManager
@@ -361,6 +367,19 @@ public class MCEFRenderer implements Closeable {
         }
 
         isAccelerated = false;
+    }
+
+    private static void closeTexture(@Nullable GpuTexture texture) {
+        switch (texture) {
+            case null -> {}
+            case MCEFDirectTexture.DirectGlTexture t -> {
+                t.close();
+                glDeleteTextures(t.getGlId());
+            }
+            case GlTexture t -> t.close();
+            default -> throw new IllegalStateException("Unexpected texture: %s (type=%s)"
+                    .formatted(texture, texture.getClass().getSimpleName()));
+        }
     }
 
 }
