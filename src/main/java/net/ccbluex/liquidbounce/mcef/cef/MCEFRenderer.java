@@ -350,14 +350,20 @@ public class MCEFRenderer implements Closeable {
     public void close() {
         RenderSystem.assertOnRenderThread();
 
-        this.directTexture.close();
-        if (texture != null) {
-            closeTexture(texture);
+        if (this.directTexture != null) {
+            this.directTexture.close();
         }
 
-        this.directSharedTexture.close();
-        if (sharedTexture != null) {
-            closeTexture(sharedTexture);
+        if (this.texture != null) {
+            closeTexture(this.texture);
+        }
+
+        if (this.directSharedTexture != null) {
+            this.directSharedTexture.close();
+        }
+
+        if (this.sharedTexture != null) {
+            closeTexture(this.sharedTexture);
         }
 
         // Unregister from TextureManager
