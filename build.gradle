@@ -60,7 +60,7 @@ dependencies {
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    implementation "com.squareup.okhttp3:okhttp:5.1.0"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }
 
 sourceSets {
