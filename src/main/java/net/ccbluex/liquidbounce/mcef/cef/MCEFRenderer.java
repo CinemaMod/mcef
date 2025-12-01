@@ -22,11 +22,11 @@
 package net.ccbluex.liquidbounce.mcef.cef;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.*;
 import net.ccbluex.liquidbounce.mcef.MCEF;
-import net.minecraft.client.texture.GlTexture;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.cef.handler.CefAcceleratedPaintInfo;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,7 +51,7 @@ public class MCEFRenderer implements Closeable {
     private int textureHeight = 0;
 
     // ResourceLocation for this renderer's texture
-    private final Identifier identifier;
+    private final ResourceLocation identifier;
     private MCEFDirectTexture directTexture;
     private MCEFDirectTexture directSharedTexture;
     private boolean textureRegistered = false;
@@ -64,7 +64,7 @@ public class MCEFRenderer implements Closeable {
         this.transparent = transparent;
         // Generate a unique ResourceLocation for this renderer
         String uniqueId = UUID.randomUUID().toString().toLowerCase().replace("-", "");
-        this.identifier = Identifier.of("mcef", "browser_" + uniqueId);
+        this.identifier = ResourceLocation.fromNamespaceAndPath("mcef", "browser_" + uniqueId);
     }
 
     /**
@@ -73,7 +73,7 @@ public class MCEFRenderer implements Closeable {
     public void initialize() {
         // Create and register the direct texture wrapper with Minecraft's TextureManager
         directTexture = new MCEFDirectTexture();
-        mc.getTextureManager().registerTexture(identifier, directTexture);
+        mc.getTextureManager().register(identifier, directTexture);
         textureRegistered = true;
         directSharedTexture = new MCEFDirectTexture();
     }
@@ -86,7 +86,7 @@ public class MCEFRenderer implements Closeable {
     @Deprecated(since = "1.21.5")
     public int getTextureId() {
         var texture = getTexture();
-        return !(texture instanceof GlTexture) ? 0 : ((GlTexture) texture).getGlId();
+        return !(texture instanceof GlTexture) ? 0 : ((GlTexture) texture).glId();
     }
 
     /**
@@ -109,9 +109,9 @@ public class MCEFRenderer implements Closeable {
      */
     public @Nullable GpuTextureView getTextureView() {
         if (isAccelerated) {
-            return directSharedTexture.getGlTextureView();
+            return directSharedTexture.getTextureView();
         } else {
-            return directTexture.getGlTextureView();
+            return directTexture.getTextureView();
         }
     }
 
@@ -119,7 +119,7 @@ public class MCEFRenderer implements Closeable {
      * Gets the Identifier that can be used with GuiGraphics and other Minecraft rendering methods.
      * This Identifier is registered with the TextureManager and points to the browser's texture.
      */
-    public Identifier getIdentifier() {
+    public ResourceLocation getIdentifier() {
         return identifier;
     }
 
@@ -251,7 +251,7 @@ public class MCEFRenderer implements Closeable {
         glDeleteMemoryObjectsEXT(memoryObject);
 
         this.directSharedTexture.setDirectTextureId(sharedTextureId, width, height);
-        this.sharedTexture = this.directSharedTexture.getGlTexture();
+        this.sharedTexture = this.directSharedTexture.getTexture();
 
         isAccelerated = true;
         unpainted = false;
@@ -298,7 +298,7 @@ public class MCEFRenderer implements Closeable {
 
             // Update the direct texture wrapper to point to our new texture
             if (directTexture != null && texture instanceof GlTexture glTexture) {
-                directTexture.setDirectTextureId(glTexture.getGlId(), width, height);
+                directTexture.setDirectTextureId(glTexture.glId(), width, height);
             }
         }
 
@@ -308,7 +308,7 @@ public class MCEFRenderer implements Closeable {
 
         if (texture instanceof GlTexture glTexture) {
             // Bind the texture directly using its GL ID
-            GlStateManager._bindTexture(glTexture.getGlId());
+            GlStateManager._bindTexture(glTexture.glId());
             GlStateManager._pixelStore(GL_UNPACK_ROW_LENGTH, width);
             GlStateManager._pixelStore(GL_UNPACK_SKIP_PIXELS, 0);
             GlStateManager._pixelStore(GL_UNPACK_SKIP_ROWS, 0);
@@ -337,7 +337,7 @@ public class MCEFRenderer implements Closeable {
 
         if (texture instanceof GlTexture glTexture) {
             // Bind and update sub-region
-            GlStateManager._bindTexture(glTexture.getGlId());
+            GlStateManager._bindTexture(glTexture.glId());
             glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA,
                     GL_UNSIGNED_INT_8_8_8_8_REV, buffer);
         }
@@ -368,7 +368,7 @@ public class MCEFRenderer implements Closeable {
 
         // Unregister from TextureManager
         if (textureRegistered && identifier != null) {
-            mc.getTextureManager().destroyTexture(identifier);
+            mc.getTextureManager().release(identifier);
             textureRegistered = false;
         }
 
@@ -380,7 +380,7 @@ public class MCEFRenderer implements Closeable {
             case null -> {}
             case MCEFDirectTexture.DirectGlTexture t -> {
                 t.close();
-                glDeleteTextures(t.getGlId());
+                glDeleteTextures(t.glId());
             }
             case GlTexture t -> t.close();
             default -> throw new IllegalStateException("Unexpected texture: %s (type=%s)"

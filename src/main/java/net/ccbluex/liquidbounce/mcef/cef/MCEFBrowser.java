@@ -26,7 +26,7 @@ import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.ccbluex.liquidbounce.mcef.MCEFPlatform;
 import net.ccbluex.liquidbounce.mcef.glfw.MCEFGlfwCursorHelper;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFCursorChangeListener;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefBrowserOsr;
 import org.cef.callback.CefDragData;
@@ -94,7 +94,7 @@ public class MCEFBrowser extends CefBrowserOsr {
         renderer = new MCEFRenderer(transparent);
         cursorChangeListener = (cefCursorID) -> setCursor(CefCursorType.fromId(cefCursorID));
 
-        mc.send(renderer::initialize);
+        mc.schedule(renderer::initialize);
     }
 
     public MCEFRenderer getRenderer() {
@@ -105,9 +105,9 @@ public class MCEFBrowser extends CefBrowserOsr {
      * Convenience method to get the ResourceLocation for this browser's texture.
      * This can be used directly with GuiGraphics rendering methods.
      *
-     * @return The Identifier for this browser's texture, or null if not initialized
+     * @return The ResourceLocation for this browser's texture, or null if not initialized
      */
-    public Identifier getTextureLocation() {
+    public ResourceLocation getTextureLocation() {
         return renderer != null ? renderer.getIdentifier() : null;
     }
 
@@ -427,7 +427,7 @@ public class MCEFBrowser extends CefBrowserOsr {
 
     @Override
     protected void finalize() throws Throwable {
-        mc.send(renderer::close);
+        mc.schedule(renderer::close);
         super.finalize();
     }
 
@@ -440,7 +440,7 @@ public class MCEFBrowser extends CefBrowserOsr {
     }
 
     public void setCursor(CefCursorType cursorType) {
-        var windowHandle = mc.getWindow().getHandle();
+        var windowHandle = mc.getWindow().handle();
 
         // We do not want to change the cursor state since Minecraft does this for us.
         if (cursorType == CefCursorType.NONE) return;

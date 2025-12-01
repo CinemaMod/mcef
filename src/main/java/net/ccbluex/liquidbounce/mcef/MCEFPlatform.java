@@ -21,11 +21,11 @@
 
 package net.ccbluex.liquidbounce.mcef;
 
-import net.minecraft.util.Util;
+import net.minecraft.Util;
 import okio.Okio;
 
-import java.util.Locale;
 import java.io.IOException;
+import java.util.Locale;
 
 public enum MCEFPlatform {
 
@@ -68,7 +68,7 @@ public enum MCEFPlatform {
             return platformInstance;
         }
 
-        var operatingSystem = Util.getOperatingSystem();
+        var operatingSystem = Util.getPlatform();
         var osArch = System.getProperty("os.arch").toLowerCase(Locale.ENGLISH);
 
         MCEF.INSTANCE.getLogger().info("Operating system: {}", operatingSystem);
@@ -88,7 +88,7 @@ public enum MCEFPlatform {
     }
 
     public boolean isSystemCompatible() {
-        var operatingSystem = Util.getOperatingSystem();
+        var operatingSystem = Util.getPlatform();
         var osVersion = System.getProperty("os.version");
         MCEF.INSTANCE.getLogger().info("OS version: {}", osVersion);
 

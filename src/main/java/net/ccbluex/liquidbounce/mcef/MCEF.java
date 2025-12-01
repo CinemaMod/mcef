@@ -22,7 +22,7 @@
 package net.ccbluex.liquidbounce.mcef;
 
 import net.ccbluex.liquidbounce.mcef.cef.*;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +48,7 @@ public enum MCEF {
         return LOGGER;
     }
 
-    public static final MinecraftClient mc = MinecraftClient.getInstance();
+    public static final Minecraft mc = Minecraft.getInstance();
 
     /**
      * Get access to various settings for MCEF.
@@ -83,7 +83,7 @@ public enum MCEF {
             } else if (platform.isMacOS()) {
                 CefHelper.getCefApp().macOSTerminationRequestRunnable = () -> {
                     shutdown();
-                    MinecraftClient.getInstance().stop();
+                    Minecraft.getInstance().stop();
                 };
             }
 

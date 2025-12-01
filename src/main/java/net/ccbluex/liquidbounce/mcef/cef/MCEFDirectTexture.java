@@ -20,11 +20,11 @@
 
 package net.ccbluex.liquidbounce.mcef.cef;
 
+import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
-import net.minecraft.client.texture.AbstractTexture;
-import net.minecraft.client.texture.GlTexture;
+import net.minecraft.client.renderer.texture.AbstractTexture;
 
 /**
  * A more efficient texture implementation that directly wraps an existing OpenGL texture ID.
@@ -51,16 +51,16 @@ public class MCEFDirectTexture extends AbstractTexture {
         
         if (textureId > 0) {
             // Create a custom GlTexture that wraps the existing ID
-            this.glTexture = new DirectGlTexture(textureId, width, height);
-            if (this.glTextureView != null) {
-                this.glTextureView.close();
+            this.texture = new DirectGlTexture(textureId, width, height);
+            if (this.textureView != null) {
+                this.textureView.close();
             }
-            this.glTextureView = RenderSystem.getDevice().createTextureView(this.glTexture);
+            this.textureView = RenderSystem.getDevice().createTextureView(this.texture);
             this.width = width;
             this.height = height;
         } else {
-            this.glTexture = null;
-            this.glTextureView = null;
+            this.texture = null;
+            this.textureView = null;
         }
     }
     
@@ -75,11 +75,11 @@ public class MCEFDirectTexture extends AbstractTexture {
     @Override
     public void close() {
         // Don't close the texture - we don't own it
-        this.glTexture = null;
+        this.texture = null;
 
-        if (this.glTextureView != null) {
-            this.glTextureView.close();
-            this.glTextureView = null;
+        if (this.textureView != null) {
+            this.textureView.close();
+            this.textureView = null;
         }
     }
     
