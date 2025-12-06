@@ -352,18 +352,22 @@ public class MCEFRenderer implements Closeable {
 
         if (this.directTexture != null) {
             this.directTexture.close();
+            this.directTexture = null;
         }
 
         if (this.texture != null) {
             closeTexture(this.texture);
+            this.texture = null;
         }
 
         if (this.directSharedTexture != null) {
             this.directSharedTexture.close();
+            this.directSharedTexture = null;
         }
 
         if (this.sharedTexture != null) {
             closeTexture(this.sharedTexture);
+            this.sharedTexture = null;
         }
 
         // Unregister from TextureManager
