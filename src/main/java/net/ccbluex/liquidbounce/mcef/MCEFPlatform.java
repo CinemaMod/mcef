@@ -21,7 +21,7 @@
 
 package net.ccbluex.liquidbounce.mcef;
 
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import okio.Okio;
 
 import java.io.IOException;

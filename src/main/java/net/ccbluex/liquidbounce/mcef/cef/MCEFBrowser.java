@@ -26,7 +26,7 @@ import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.ccbluex.liquidbounce.mcef.MCEFPlatform;
 import net.ccbluex.liquidbounce.mcef.glfw.MCEFGlfwCursorHelper;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFCursorChangeListener;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefBrowserOsr;
 import org.cef.callback.CefDragData;
@@ -107,7 +107,7 @@ public class MCEFBrowser extends CefBrowserOsr {
      *
      * @return The ResourceLocation for this browser's texture, or null if not initialized
      */
-    public ResourceLocation getTextureLocation() {
+    public Identifier getTextureLocation() {
         return renderer != null ? renderer.getIdentifier() : null;
     }
 

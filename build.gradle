@@ -83,7 +83,7 @@ processResources {
                 'mod_name': mod_name,
                 'mod_vendor': mod_vendor,
                 'mod_version': mod_version,
-                'minecraft_version': '>=1.21.6 <=1.21.10',
+                'minecraft_version': minecraft_version,
                 'loader_version': loader_version
     }
 

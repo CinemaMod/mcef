@@ -22,8 +22,10 @@ package net.ccbluex.liquidbounce.mcef.cef;
 
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
+import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 
 /**
@@ -34,9 +36,12 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 public class MCEFDirectTexture extends AbstractTexture {
     private int width;
     private int height;
-    
-    public MCEFDirectTexture() {}
-    
+    private TextureSetup textureSetup;
+
+    public MCEFDirectTexture() {
+        this.sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR, false);
+    }
+
     /**
      * Directly set the texture to an existing OpenGL texture ID.
      * This is more efficient than creating a new texture and copying data.
@@ -56,6 +61,7 @@ public class MCEFDirectTexture extends AbstractTexture {
                 this.textureView.close();
             }
             this.textureView = RenderSystem.getDevice().createTextureView(this.texture);
+            this.textureSetup = TextureSetup.singleTexture(this.getTextureView(), this.getSampler());
             this.width = width;
             this.height = height;
         } else {
@@ -81,8 +87,14 @@ public class MCEFDirectTexture extends AbstractTexture {
             this.textureView.close();
             this.textureView = null;
         }
+
+        this.textureSetup = TextureSetup.noTexture();
     }
-    
+
+    public TextureSetup getTextureSetup() {
+        return this.textureSetup;
+    }
+
     /**
      * Custom GlTexture implementation that wraps an existing OpenGL texture ID
      * without managing its lifecycle.

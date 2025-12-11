@@ -26,7 +26,8 @@ import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.*;
 import net.ccbluex.liquidbounce.mcef.MCEF;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.resources.Identifier;
 import org.cef.handler.CefAcceleratedPaintInfo;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,7 +52,7 @@ public class MCEFRenderer implements Closeable {
     private int textureHeight = 0;
 
     // ResourceLocation for this renderer's texture
-    private final ResourceLocation identifier;
+    private final Identifier identifier;
     private MCEFDirectTexture directTexture;
     private MCEFDirectTexture directSharedTexture;
     private boolean textureRegistered = false;
@@ -64,7 +65,7 @@ public class MCEFRenderer implements Closeable {
         this.transparent = transparent;
         // Generate a unique ResourceLocation for this renderer
         String uniqueId = UUID.randomUUID().toString().toLowerCase().replace("-", "");
-        this.identifier = ResourceLocation.fromNamespaceAndPath("mcef", "browser_" + uniqueId);
+        this.identifier = Identifier.fromNamespaceAndPath("mcef", "browser_" + uniqueId);
     }
 
     /**
@@ -116,10 +117,35 @@ public class MCEFRenderer implements Closeable {
     }
 
     /**
+     * Returns the sampler to be used for the renderer textures.
+     * @return GpuSampler
+     */
+    public GpuSampler getSampler() {
+        if (isAccelerated) {
+            return directSharedTexture.getSampler();
+        } else {
+            return directTexture.getSampler();
+        }
+    }
+
+    /**
+     * Returns the texture setup for the renderer.
+     * If accelerated rendering is enabled, it returns the shared texture setup.
+     * @return TextureSetup
+     */
+    public @Nullable TextureSetup getTextureSetup() {
+        if (isAccelerated) {
+            return directSharedTexture.getTextureSetup();
+        } else {
+            return directTexture.getTextureSetup();
+        }
+    }
+
+    /**
      * Gets the Identifier that can be used with GuiGraphics and other Minecraft rendering methods.
      * This Identifier is registered with the TextureManager and points to the browser's texture.
      */
-    public ResourceLocation getIdentifier() {
+    public Identifier getIdentifier() {
         return identifier;
     }
 
@@ -288,10 +314,6 @@ public class MCEFRenderer implements Closeable {
                     1, // depthOrLayers
                     1  // mipLevels
             );
-
-            // Configure texture parameters
-            texture.setTextureFilter(FilterMode.LINEAR, FilterMode.LINEAR, false);
-            texture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 
             textureWidth = width;
             textureHeight = height;
