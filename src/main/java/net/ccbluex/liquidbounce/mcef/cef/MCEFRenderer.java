@@ -24,19 +24,29 @@ package net.ccbluex.liquidbounce.mcef.cef;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.blaze3d.textures.*;
 import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.resources.Identifier;
 import org.cef.handler.CefAcceleratedPaintInfo;
+import org.cef.handler.CefAcceleratedPaintInfoLinux;
+import org.cef.handler.CefAcceleratedPaintInfoWin;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.egl.EGL;
+import org.lwjgl.egl.EGL14;
+import org.lwjgl.egl.EGLCapabilities;
+import org.lwjgl.egl.EXTImageDMABufImport;
+import org.lwjgl.egl.KHRImageBase;
+import org.lwjgl.opengl.EXTEGLImageStorage;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.JNI;
+import org.lwjgl.system.MemoryUtil;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.util.Arrays;
 import java.util.UUID;
 
 import static net.ccbluex.liquidbounce.mcef.MCEF.mc;
@@ -49,6 +59,9 @@ import static org.lwjgl.opengl.GL12.GL_UNSIGNED_INT_8_8_8_8_REV;
 
 @NullMarked
 public class MCEFRenderer implements Closeable {
+
+    private static @Nullable EGLCapabilities eglCapabilities = null;
+    private static long eglDisplay = EGL14.EGL_NO_DISPLAY;
 
     private final boolean transparent;
     private @Nullable GpuTexture texture = null;
@@ -208,11 +221,8 @@ public class MCEFRenderer implements Closeable {
     }
 
     /**
-     * Handles accelerated paint events from CEF. This method is called when CEF provides a shared texture
-     * for accelerated rendering. On Windows, this texture is a D3D11 shared texture handle.
+     * Handles accelerated paint events from CEF.
      * <p>
-     * TODO: For other platforms, we have no support yet.
-     *
      * @param info   The CefAcceleratedPaintInfo containing the shared texture handle and other information.
      * @param width  The width of the texture.
      * @param height The height of the texture.
@@ -222,6 +232,23 @@ public class MCEFRenderer implements Closeable {
 
         var directSharedTexture = this.directSharedTexture;
         if (directSharedTexture == null) {
+            return;
+        }
+
+        switch (info) {
+            case CefAcceleratedPaintInfoWin winInfo -> onAcceleratedPaintWindows(winInfo, width, height);
+            case CefAcceleratedPaintInfoLinux linuxInfo -> onAcceleratedPaintLinux(linuxInfo, width, height);
+            default -> MCEF.INSTANCE.LOGGER.warn("Unsupported CefAcceleratedPaintInfo type: {}", info.getClass().getName());
+        }
+    }
+
+    /**
+     * Called when CEF provides D3D11 texture handle.
+     * Requires conversion from D3D11 texture to OpenGL texture using glImportMemoryWin32HandleEXT.
+     */
+    private void onAcceleratedPaintWindows(CefAcceleratedPaintInfoWin info, int width, int height) {
+        if (info.shared_texture_handle == 0) {
+            MCEF.INSTANCE.LOGGER.warn("Accelerated paint shared texture handle is invalid.");
             return;
         }
 
@@ -283,12 +310,229 @@ public class MCEFRenderer implements Closeable {
 
         directSharedTexture.setDirectTextureId(sharedTextureId, width, height);
         this.sharedTexture = directSharedTexture.getTexture();
+        this.textureWidth = width;
+        this.textureHeight = height;
 
         isAccelerated = true;
         unpainted = false;
         isBGRA = true;
 
         GlStateManager._bindTexture(0);
+    }
+
+    /**
+     * Called when CEF provides dmabuf planes on Linux. Imported using OpenGL EGL.
+     */
+    private void onAcceleratedPaintLinux(CefAcceleratedPaintInfoLinux info, int width, int height) {
+        if (!info.hasDmaBufPlanes()) {
+            MCEF.INSTANCE.LOGGER.warn("Accelerated paint info has no dmabuf planes on Linux.");
+            return;
+        }
+
+        var display = getEglDisplay();
+        if (display == EGL14.EGL_NO_DISPLAY) {
+            MCEF.INSTANCE.LOGGER.error("EGL display is not available for dmabuf import.");
+            return;
+        }
+
+        if (eglCapabilities == null || EGL.getCapabilities() == null) {
+            ensureEglCapabilities(display);
+        }
+
+        if (EGL14.eglGetCurrentContext() == EGL14.EGL_NO_CONTEXT) {
+            MCEF.INSTANCE.LOGGER.warn("No current EGL context available for dmabuf import.");
+            return;
+        }
+
+        var drmFormat = switch (info.format) {
+            case CefConstants.CEF_COLOR_TYPE_RGBA_8888 -> CefConstants.DRM_FORMAT_ABGR8888;
+            case CefConstants.CEF_COLOR_TYPE_BGRA_8888 -> CefConstants.DRM_FORMAT_ARGB8888;
+            default -> 0;
+        };
+
+        if (drmFormat == 0) {
+            MCEF.INSTANCE.LOGGER.error("Unsupported accelerated paint format: {}", info.format);
+            return;
+        }
+
+        var planeCount = Math.min(info.plane_count, CefConstants.DMA_BUF_PLANE_FD_ATTRS.length);
+        planeCount = Math.min(planeCount, info.plane_fds.length);
+        planeCount = Math.min(planeCount, info.plane_strides.length);
+        planeCount = Math.min(planeCount, info.plane_offsets.length);
+        if (planeCount <= 0) {
+            MCEF.INSTANCE.LOGGER.warn("No dmabuf planes available for accelerated paint.");
+            return;
+        }
+
+        var useModifiers = eglCapabilities.EGL_EXT_image_dma_buf_import_modifiers;
+        var modifier = info.modifier;
+
+        var planeAttribInts = useModifiers ? 10 : 6;
+        var attribCapacity = 6 + (planeCount * planeAttribInts) + 1;
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            MCEF.INSTANCE.LOGGER.debug(
+                    "dmabuf planes: count={}, fds={}, strides={}, offsets={}, modifier=0x{}",
+                    planeCount,
+                    Arrays.toString(info.plane_fds),
+                    Arrays.toString(info.plane_strides),
+                    Arrays.toString(info.plane_offsets),
+                    Long.toHexString(modifier)
+            );
+            MCEF.INSTANCE.LOGGER.debug(
+                    "EGL display: display=0x{}",
+                    Long.toHexString(display)
+            );
+            MCEF.INSTANCE.LOGGER.debug(
+                    "dmabuf format: drmFormat=0x{}, size={}x{}",
+                    Integer.toHexString(drmFormat),
+                    width,
+                    height
+            );
+
+            var attribs = stack.mallocInt(attribCapacity);
+            attribs.put(EGL14.EGL_WIDTH).put(width);
+            attribs.put(EGL14.EGL_HEIGHT).put(height);
+            attribs.put(EXTImageDMABufImport.EGL_LINUX_DRM_FOURCC_EXT).put(drmFormat);
+
+            for (int i = 0; i < planeCount; i++) {
+                long offset = info.plane_offsets[i];
+                if (offset > Integer.MAX_VALUE) {
+                    MCEF.INSTANCE.LOGGER.error("dmabuf plane offset too large for EGL attributes: {}", offset);
+                    return;
+                }
+
+                attribs.put(CefConstants.DMA_BUF_PLANE_FD_ATTRS[i]).put(info.plane_fds[i]);
+                attribs.put(CefConstants.DMA_BUF_PLANE_OFFSET_ATTRS[i]).put((int) offset);
+                attribs.put(CefConstants.DMA_BUF_PLANE_PITCH_ATTRS[i]).put(info.plane_strides[i]);
+
+                if (useModifiers) {
+                    int modifierLo = (int) (modifier & 0xffffffffL);
+                    int modifierHi = (int) ((modifier >>> 32) & 0xffffffffL);
+                    attribs.put(CefConstants.DMA_BUF_PLANE_MODIFIER_LO_ATTRS[i]).put(modifierLo);
+                    attribs.put(CefConstants.DMA_BUF_PLANE_MODIFIER_HI_ATTRS[i]).put(modifierHi);
+                }
+            }
+
+            attribs.put(EGL14.EGL_NONE);
+            attribs.flip();
+
+            var attribSnapshot = new int[attribs.remaining()];
+            attribs.get(attribSnapshot);
+            attribs.rewind();
+            MCEF.INSTANCE.LOGGER.debug(
+                    "eglCreateImageKHR dmabuf attribs: {}",
+                    Arrays.toString(attribSnapshot)
+            );
+
+            var eglImage = eglCreateImageKHR(
+                    display,
+                    EGL14.EGL_NO_CONTEXT,
+                    EXTImageDMABufImport.EGL_LINUX_DMA_BUF_EXT,
+                    0L,
+                    attribs
+            );
+
+            if (eglImage == 0) {
+                var eglError = EGL14.eglGetError();
+                MCEF.INSTANCE.LOGGER.error(
+                        "eglCreateImageKHR failed for dmabuf import. eglGetError=0x{}",
+                        Integer.toHexString(eglError)
+                );
+                MCEF.INSTANCE.LOGGER.error(
+                        "dmabuf attribs at failure: {}",
+                        Arrays.toString(attribSnapshot)
+                );
+                return;
+            }
+
+            if (transparent) {
+                GlStateManager._enableBlend();
+            }
+
+            var sharedTextureId = glGenTextures();
+            GlStateManager._bindTexture(sharedTextureId);
+            EXTEGLImageStorage.glEGLImageTargetTexStorageEXT(GL_TEXTURE_2D, eglImage, (IntBuffer) null);
+            KHRImageBase.eglDestroyImageKHR(display, eglImage);
+
+            var error = glGetError();
+            if (error != GL_NO_ERROR) {
+                MCEF.INSTANCE.LOGGER.error("glEGLImageTargetTexture2DOES failed with error: {}", error);
+                glDeleteTextures(sharedTextureId);
+                return;
+            }
+
+            closeTexture(this.sharedTexture);
+
+            directSharedTexture.setDirectTextureId(sharedTextureId, width, height);
+            this.sharedTexture = directSharedTexture.getTexture();
+            this.textureWidth = width;
+            this.textureHeight = height;
+
+            isAccelerated = true;
+            unpainted = false;
+            isBGRA = info.format != CefConstants.CEF_COLOR_TYPE_BGRA_8888;
+
+            GlStateManager._bindTexture(0);
+        }
+    }
+
+    private static long getEglDisplay() {
+        if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
+            return eglDisplay;
+        }
+
+        long display = EGL14.eglGetCurrentDisplay();
+        if (display == EGL14.EGL_NO_DISPLAY) {
+            display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
+        }
+
+        if (display == EGL14.EGL_NO_DISPLAY) {
+            return EGL14.EGL_NO_DISPLAY;
+        }
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer major = stack.mallocInt(1);
+            IntBuffer minor = stack.mallocInt(1);
+            if (!EGL14.eglInitialize(display, major, minor)) {
+                MCEF.INSTANCE.LOGGER.error("eglInitialize failed for EGL display.");
+                return EGL14.EGL_NO_DISPLAY;
+            }
+        }
+
+        eglDisplay = display;
+        return eglDisplay;
+    }
+
+
+    private static void ensureEglCapabilities(long display) {
+        try {
+            EGL.getCapabilities();
+        } catch (IllegalStateException ignored) {
+            EGL.create();
+        }
+
+        EGLCapabilities clientCaps = EGL.getCapabilities();
+        if (clientCaps.eglCreateImageKHR == 0L || clientCaps.eglDestroyImageKHR == 0L) {
+            // Some drivers only report client extensions after eglInitialize on a display.
+            EGL.destroy();
+            EGL.create();
+        }
+
+        eglCapabilities = EGL.createDisplayCapabilities(display);
+    }
+
+    /**
+     * A copy of [{@link KHRImageBase#eglCreateImageKHR}] to bypass argument checks.
+     */
+    private static long eglCreateImageKHR(long display, long context, int target, long buffer, IntBuffer attribs) {
+        long functionAddress = EGL.getCapabilities().eglCreateImageKHR;
+        if (functionAddress == 0L) {
+            MCEF.INSTANCE.LOGGER.error("eglCreateImageKHR is not available on this EGL implementation.");
+            return 0L;
+        }
+
+        return JNI.callPPPPP(display, context, target, buffer, MemoryUtil.memAddress(attribs), functionAddress);
     }
 
     /**

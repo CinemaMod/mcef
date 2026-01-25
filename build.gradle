@@ -61,6 +61,7 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "org.lwjgl:lwjgl-egl:3.3.3"
 }
 
 sourceSets {

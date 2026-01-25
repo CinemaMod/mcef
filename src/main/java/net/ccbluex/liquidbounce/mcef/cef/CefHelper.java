@@ -81,6 +81,17 @@ public final class CefHelper {
             setUnixExecutable(jcefHelperRendererFile);
         }
 
+        if (platform.isLinux()) {
+            var switches = settings.getCefSwitches();
+            if (switches.stream().noneMatch(s -> s.startsWith("--use-angle"))) {
+                switches.add("--use-angle=gl");
+            }
+            if (switches.stream().noneMatch(s -> s.startsWith("--ozone-platform"))) {
+                var ozonePlatform = System.getenv("WAYLAND_DISPLAY") != null ? "wayland" : "x11";
+                switches.add("--ozone-platform=" + ozonePlatform);
+            }
+        }
+
         var cefSwitches = settings.getCefSwitches().toArray(new String[0]);
 
         for (var nativeLibrary : natives) {
