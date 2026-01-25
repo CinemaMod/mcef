@@ -24,12 +24,15 @@ package net.ccbluex.liquidbounce.mcef.cef;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.*;
+import com.mojang.blaze3d.textures.GpuSampler;
+import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.textures.TextureFormat;
 import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.resources.Identifier;
 import org.cef.handler.CefAcceleratedPaintInfo;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
@@ -220,6 +223,11 @@ public class MCEFRenderer implements Closeable {
     protected void onAcceleratedPaint(CefAcceleratedPaintInfo info, int width, int height) {
         RenderSystem.assertOnRenderThread();
 
+        var directSharedTexture = this.directSharedTexture;
+        if (directSharedTexture == null) {
+            return;
+        }
+
         if (transparent) {
             GlStateManager._enableBlend();
         }
@@ -276,8 +284,8 @@ public class MCEFRenderer implements Closeable {
         closeTexture(this.sharedTexture);
         glDeleteMemoryObjectsEXT(memoryObject);
 
-        this.directSharedTexture.setDirectTextureId(sharedTextureId, width, height);
-        this.sharedTexture = this.directSharedTexture.getTexture();
+        directSharedTexture.setDirectTextureId(sharedTextureId, width, height);
+        this.sharedTexture = directSharedTexture.getTexture();
 
         isAccelerated = true;
         unpainted = false;
