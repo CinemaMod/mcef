@@ -32,6 +32,7 @@ import net.ccbluex.liquidbounce.mcef.MCEF;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.resources.Identifier;
 import org.cef.handler.CefAcceleratedPaintInfo;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
@@ -46,6 +47,7 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_BGRA;
 import static org.lwjgl.opengl.GL12.GL_UNSIGNED_INT_8_8_8_8_REV;
 
+@NullMarked
 public class MCEFRenderer implements Closeable {
 
     private final boolean transparent;
@@ -56,8 +58,8 @@ public class MCEFRenderer implements Closeable {
 
     // ResourceLocation for this renderer's texture
     private final Identifier identifier;
-    private MCEFDirectTexture directTexture;
-    private MCEFDirectTexture directSharedTexture;
+    private @Nullable MCEFDirectTexture directTexture;
+    private @Nullable MCEFDirectTexture directSharedTexture;
     private boolean textureRegistered = false;
 
     private boolean isBGRA = false;
@@ -106,29 +108,27 @@ public class MCEFRenderer implements Closeable {
         }
     }
 
+    private @Nullable MCEFDirectTexture getDirectTexture() {
+        return isAccelerated ? directSharedTexture : directTexture;
+    }
+
     /**
      * Returns the texture view for the renderer.
      * If accelerated rendering is enabled, it returns the shared texture.
      * @return GpuTextureView
      */
     public @Nullable GpuTextureView getTextureView() {
-        if (isAccelerated) {
-            return directSharedTexture.getTextureView();
-        } else {
-            return directTexture.getTextureView();
-        }
+        var directTexture = this.getDirectTexture();
+        return directTexture == null ? null : directTexture.getTextureView();
     }
 
     /**
      * Returns the sampler to be used for the renderer textures.
      * @return GpuSampler
      */
-    public GpuSampler getSampler() {
-        if (isAccelerated) {
-            return directSharedTexture.getSampler();
-        } else {
-            return directTexture.getSampler();
-        }
+    public @Nullable GpuSampler getSampler() {
+        var directTexture = this.getDirectTexture();
+        return directTexture == null ? null : directTexture.getSampler();
     }
 
     /**
@@ -137,11 +137,8 @@ public class MCEFRenderer implements Closeable {
      * @return TextureSetup
      */
     public @Nullable TextureSetup getTextureSetup() {
-        if (isAccelerated) {
-            return directSharedTexture.getTextureSetup();
-        } else {
-            return directTexture.getTextureSetup();
-        }
+        var directTexture = this.getDirectTexture();
+        return directTexture == null ? null : directTexture.getTextureSetup();
     }
 
     /**
@@ -401,7 +398,7 @@ public class MCEFRenderer implements Closeable {
         }
 
         // Unregister from TextureManager
-        if (textureRegistered && identifier != null) {
+        if (textureRegistered) {
             mc.getTextureManager().release(identifier);
             textureRegistered = false;
         }
