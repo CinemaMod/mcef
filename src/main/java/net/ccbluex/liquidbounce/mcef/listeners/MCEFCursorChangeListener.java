@@ -23,5 +23,5 @@ package net.ccbluex.liquidbounce.mcef.listeners;
 
 @FunctionalInterface
 public interface MCEFCursorChangeListener {
-    void onCursorChange(int cursorID);
+    void onCursorChange(int cursorId);
 }

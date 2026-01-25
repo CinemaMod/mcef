@@ -25,9 +25,10 @@ import net.ccbluex.liquidbounce.mcef.download.MCEFProvidedResourceManager;
 import net.ccbluex.liquidbounce.mcef.listeners.MCEFProgressListener;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
-import org.jetbrains.annotations.NotNull;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,28 +60,28 @@ public class MCEFDownloadManager {
     private final List<MCEFProgressListener> progressListeners = new ArrayList<>();
     private final MCEFProgressListener progressListener = new MCEFProgressListener() {
         @Override
-        public void onProgressUpdate(@NotNull String task, float progress) {
+        public void onProgressUpdate(String task, float progress) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onProgressUpdate(task, progress);
             }
         }
 
         @Override
-        public void onFileStart(@NotNull String task) {
+        public void onFileStart(String task) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onFileStart(task);
             }
         }
 
         @Override
-        public void onFileProgress(@NotNull String task, long bytesRead, long contentLength, boolean done) {
+        public void onFileProgress(String task, long bytesRead, long contentLength, boolean done) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onFileProgress(task, bytesRead, contentLength, done);
             }
         }
 
         @Override
-        public void onFileEnd(@NotNull String task) {
+        public void onFileEnd(String task) {
             for (MCEFProgressListener listener : progressListeners) {
                 listener.onFileEnd(task);
             }
@@ -112,7 +113,7 @@ public class MCEFDownloadManager {
 
     static MCEFDownloadManager newResourceManager() throws IOException {
         var javaCefCommit = MCEF.INSTANCE.getJavaCefCommit();
-        MCEF.INSTANCE.getLogger().info("JCEF Commit: " + javaCefCommit);
+        MCEF.INSTANCE.getLogger().info("JCEF Commit: {}", javaCefCommit);
         var settings = MCEF.INSTANCE.getSettings();
 
         var providedPath = System.getenv("PROVIDED_JCEF_PATH");

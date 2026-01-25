@@ -24,16 +24,12 @@ import okhttp3.Interceptor;
 import okhttp3.MediaType;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import okio.Buffer;
-import okio.BufferedSource;
-import okio.ForwardingSource;
-import okio.Okio;
-import okio.Source;
-import org.jetbrains.annotations.NotNull;
+import okio.*;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 
-public class OkHttpProgressInterceptor implements Interceptor {
+public final class OkHttpProgressInterceptor implements Interceptor {
 
     private final ProgressListener progressListener;
 
@@ -42,13 +38,14 @@ public class OkHttpProgressInterceptor implements Interceptor {
     }
 
     @Override
-    public @NotNull Response intercept(@NotNull Interceptor.Chain chain) throws IOException {
+    public Response intercept(Interceptor.Chain chain) throws IOException {
         var originalResponse = chain.proceed(chain.request());
         return originalResponse.newBuilder()
                 .body(new ProgressResponseBody(originalResponse.body(), progressListener))
                 .build();
     }
 
+    @FunctionalInterface
     public interface ProgressListener {
         void update(long bytesRead, long contentLength, boolean done);
     }
@@ -56,7 +53,7 @@ public class OkHttpProgressInterceptor implements Interceptor {
     private static class ProgressResponseBody extends ResponseBody {
         private final ResponseBody responseBody;
         private final ProgressListener progressListener;
-        private BufferedSource bufferedSource;
+        private @Nullable BufferedSource bufferedSource;
 
         ProgressResponseBody(ResponseBody responseBody, ProgressListener progressListener) {
             this.responseBody = responseBody;
@@ -64,7 +61,7 @@ public class OkHttpProgressInterceptor implements Interceptor {
         }
 
         @Override
-        public MediaType contentType() {
+        public @Nullable MediaType contentType() {
             return responseBody.contentType();
         }
 
@@ -74,7 +71,7 @@ public class OkHttpProgressInterceptor implements Interceptor {
         }
 
         @Override
-        public @NotNull BufferedSource source() {
+        public BufferedSource source() {
             if (bufferedSource == null) {
                 bufferedSource = Okio.buffer(source(responseBody.source()));
             }
@@ -86,7 +83,7 @@ public class OkHttpProgressInterceptor implements Interceptor {
                 private long totalBytesRead = 0L;
 
                 @Override
-                public long read(@NotNull Buffer sink, long byteCount) throws IOException {
+                public long read(Buffer sink, long byteCount) throws IOException {
                     long bytesRead = super.read(sink, byteCount);
                     
                     // read() returns -1 when the source is exhausted
