@@ -24,11 +24,18 @@ import com.cinemamod.mcef.internal.MCEFDownloadListener;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.apache.commons.io.FileUtils;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A downloader and extraction tool for java-cef builds.
@@ -40,6 +47,13 @@ import java.net.URL;
 public class MCEFDownloader {
     private static final String JAVA_CEF_DOWNLOAD_URL = "${host}/java-cef-builds/${java-cef-commit}/${platform}.tar.gz";
     private static final String JAVA_CEF_CHECKSUM_DOWNLOAD_URL = "${host}/java-cef-builds/${java-cef-commit}/${platform}.tar.gz.sha256";
+    private static final int MAX_CHECKSUM_BYTES = 4096;
+    private static final String SHA_256 = "([0-9a-fA-F]{64})";
+    private static final Pattern BARE_CHECKSUM_PATTERN = Pattern.compile(SHA_256);
+    private static final Pattern SHA_256_SUM_PATTERN = Pattern.compile(SHA_256 + "\\h+\\*?\\S.*");
+    private static final Pattern POWERSHELL_HEADER_PATTERN = Pattern.compile("Algorithm\\h+Hash\\h+Path\\h*");
+    private static final Pattern POWERSHELL_SEPARATOR_PATTERN = Pattern.compile("-+\\h+-+\\h+-+\\h*");
+    private static final Pattern POWERSHELL_CHECKSUM_PATTERN = Pattern.compile("SHA256\\h+" + SHA_256 + "\\h+\\S.*");
 
     private final String host;
     private final String javaCefCommitHash;
@@ -89,21 +103,94 @@ public class MCEFDownloader {
         MCEFDownloadListener.INSTANCE.setTask("Downloading Checksum");
         downloadFile(getJavaCefChecksumDownloadUrl(), jcefBuildHashFileTemp);
 
-        if (jcefBuildHashFile.exists()) {
-            boolean sameContent = FileUtils.contentEquals(jcefBuildHashFile, jcefBuildHashFileTemp);
-            if (sameContent) {
-                jcefBuildHashFileTemp.delete();
-                return true;
-            } else {
-                MCEF.getLogger().warn("JCEF Hash does not match.");
+        return installJavaCefChecksum(jcefBuildHashFile, jcefBuildHashFileTemp);
+    }
+
+    static boolean installJavaCefChecksum(File checksumFile, File downloadedChecksumFile) throws IOException {
+        String downloadedChecksum;
+        try {
+            downloadedChecksum = extractSha256(downloadedChecksumFile);
+        } catch (IOException exception) {
+            try {
+                Files.deleteIfExists(downloadedChecksumFile.toPath());
+            } catch (IOException deleteException) {
+                exception.addSuppressed(deleteException);
             }
+            throw exception;
+        }
+
+        if (checksumFile.exists()) {
+            try {
+                if (extractSha256(checksumFile).equals(downloadedChecksum)) {
+                    Files.delete(downloadedChecksumFile.toPath());
+                    return true;
+                }
+            } catch (MalformedChecksumException ignored) {
+                // Treat a malformed local marker as a mismatch so the valid remote marker replaces it.
+            }
+            MCEF.getLogger().warn("JCEF Hash does not match.");
         } else {
             MCEF.getLogger().warn("Failed to download JCEF hash.");
         }
 
-        jcefBuildHashFileTemp.renameTo(jcefBuildHashFile);
-
+        Files.move(downloadedChecksumFile.toPath(), checksumFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
         return false;
+    }
+
+    static String extractSha256(File checksumFile) throws IOException {
+        byte[] content;
+        try (InputStream inputStream = Files.newInputStream(checksumFile.toPath())) {
+            content = inputStream.readNBytes(MAX_CHECKSUM_BYTES + 1);
+        }
+        if (content.length > MAX_CHECKSUM_BYTES) {
+            throw new MalformedChecksumException("Checksum content exceeds " + MAX_CHECKSUM_BYTES + " bytes");
+        }
+
+        String decoded = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(content))
+                .toString();
+        return parseSha256(decoded);
+    }
+
+    static String parseSha256(String content) throws MalformedChecksumException {
+        String[] lines = content.split("\\R", -1);
+        int firstLine = 0;
+        while (firstLine < lines.length && lines[firstLine].isBlank()) {
+            firstLine++;
+        }
+        int lastLine = lines.length - 1;
+        while (lastLine >= firstLine && lines[lastLine].isBlank()) {
+            lastLine--;
+        }
+
+        if (firstLine == lastLine) {
+            Matcher bareChecksum = BARE_CHECKSUM_PATTERN.matcher(lines[firstLine]);
+            if (bareChecksum.matches()) {
+                return bareChecksum.group(1).toUpperCase(Locale.US);
+            }
+
+            Matcher sha256Sum = SHA_256_SUM_PATTERN.matcher(lines[firstLine]);
+            if (sha256Sum.matches()) {
+                return sha256Sum.group(1).toUpperCase(Locale.US);
+            }
+        } else if (lastLine - firstLine == 2
+                && POWERSHELL_HEADER_PATTERN.matcher(lines[firstLine]).matches()
+                && POWERSHELL_SEPARATOR_PATTERN.matcher(lines[firstLine + 1]).matches()) {
+            Matcher powershellChecksum = POWERSHELL_CHECKSUM_PATTERN.matcher(lines[lastLine]);
+            if (powershellChecksum.matches()) {
+                return powershellChecksum.group(1).toUpperCase(Locale.US);
+            }
+        }
+
+        throw new MalformedChecksumException("Checksum content has an unsupported format");
+    }
+
+    static class MalformedChecksumException extends IOException {
+        MalformedChecksumException(String message) {
+            super(message);
+        }
     }
 
     public void extractJavaCefBuild(boolean delete) {
