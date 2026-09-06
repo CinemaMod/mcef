@@ -52,6 +52,12 @@ dependencies {
         parchment("org.parchmentmc.data:parchment-1.21:2024.07.28@zip")
     }
     modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 sourceSets {
@@ -64,6 +70,10 @@ sourceSets {
 
     main {
         compileClasspath += jcef.output
+        runtimeClasspath += jcef.output
+    }
+
+    test {
         runtimeClasspath += jcef.output
     }
 }
