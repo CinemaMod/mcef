@@ -43,6 +43,7 @@ public final class MCEF {
     private static MCEFSettings settings;
     private static MCEFApp app;
     private static MCEFClient client;
+    private static BrowserPoolManager browserPool;
 
     private static final ArrayList<MCEFInitListener> awaitingInit = new ArrayList<>();
 
@@ -83,6 +84,9 @@ public final class MCEF {
             awaitingInit.forEach(t -> t.onInit(true));
             awaitingInit.clear();
             MCEF.getLogger().info("Chromium Embedded Framework initialized");
+
+            browserPool = new BrowserPoolManager();
+            MCEF.getLogger().info("Browser pool manager initialized");
 
             app.getHandle().registerSchemeHandlerFactory(
                     "mod", "",
@@ -156,6 +160,25 @@ public final class MCEF {
         return browser;
     }
 
+    public static MCEFBrowser getBrowserFromPool(
+            String url, boolean transparent, boolean shared, Object owner) {
+        assertInitialized();
+        if (browserPool == null) {
+            MCEF.getLogger().warn("Browser pool not initialized, creating browser directly");
+            return createBrowser(url, transparent);
+        }
+        return browserPool.getBrowser(url, transparent, shared, owner);
+    }
+
+    public static void releaseBrowserToPool(MCEFBrowser browser, Object owner) {
+        if (browserPool != null) {
+            browserPool.releaseBrowser(browser, owner);
+        } else {
+            MCEF.getLogger().warn("Browser pool not initialized, closing browser directly");
+            browser.close(true);
+        }
+    }
+
     /**
      * Check if MCEF is initialized.
      * @return true if MCEF is initialized correctly, false if not
@@ -169,6 +192,11 @@ public final class MCEF {
      */
     public static void shutdown() {
         if (isInitialized()) {
+            if (browserPool != null) {
+                browserPool.shutdown();
+                browserPool = null;
+                MCEF.getLogger().info("Browser pool manager shut down");
+            }
             CefUtil.shutdown();
             client = null;
             app = null;

@@ -9,6 +9,12 @@ MCEF is based on java-cef (Java Chromium Embedded Framework), which is based on 
 
 MCEF contains a downloader system for downloading the java-cef & CEF binaries required by the Chromium browser. This requires a connection to https://mcef-download.cinemamod.com.
 
+Downloaded java-cef archives are checked against the SHA-256 value served by that HTTPS endpoint. After installation, MCEF records and validates the length and SHA-256 of every installed file so missing or modified files are repaired. This local integrity manifest detects later damage; it is not an additional source of authenticity.
+
+The `skip-download` setting is an explicit offline/manual mode. It only starts with an installation that already has a valid MCEF integrity manifest for the current platform and java-cef commit. To migrate a manual installation safely, disable `skip-download` once so MCEF downloads and verifies the archive and creates the manifest. A retained local `<platform>.tar.gz` may only be used by tooling after its digest is checked against the trusted HTTPS checksum; never hash an arbitrary installed directory and label it archive-authenticated.
+
+The checksum endpoint and every checksum redirect must remain HTTPS. Redirect loops and HTTPS-to-HTTP downgrade attempts are rejected. Custom mirrors therefore need a valid HTTPS checksum endpoint even if the archive itself is hosted separately.
+
 Discussion: https://discord.gg/rNrh5kW8Ty
 
 Current Chromium version: `116.0.5845.190`
